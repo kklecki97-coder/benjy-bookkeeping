@@ -8,14 +8,12 @@ import { extractWords, groupRowsByY, parseAmount } from "./pdf-utils";
  * These are the figures that matter for bookkeeping (net sales, tax).
  */
 const SUMMARY_LABELS = [
-  "Net Taxable Sales",
-  "Net Non Taxable Sales",
-  "Total Product Sales",
-  "Total Delivery Fee",
-  "Total Sales",
+  // Only the two lines that are real accounting postings. Hana's report has
+  // several overlapping summary views (Gross, Taxable, Total Product, etc.) —
+  // emitting all of them creates duplicate/confusing review items. Net Total
+  // Sales is the revenue figure; Sales Tax Charged is the tax liability.
   "Net Total Sales",
   "SalesTax Charged",
-  "Total Gross Sales",
 ];
 
 function matchLabel(text: string): string | null {

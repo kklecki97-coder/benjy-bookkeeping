@@ -29,6 +29,7 @@ export function ExceptionRow({ tx }: { tx: ExceptionTx }) {
   const [category, setCategory] = useState(tx.suggested_category ?? "");
   const [vendor, setVendor] = useState(tx.suggested_vendor ?? "");
   const [note, setNote] = useState("");
+  const [saveAsRule, setSaveAsRule] = useState(true);
   const [pending, startTransition] = useTransition();
 
   return (
@@ -73,13 +74,28 @@ export function ExceptionRow({ tx }: { tx: ExceptionTx }) {
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={saveAsRule}
+              onChange={(e) => setSaveAsRule(e.target.checked)}
+              className="accent-primary size-4"
+            />
+            Save as a rule so future “{tx.description.split(/\s+/).slice(0, 2).join(" ")}…” transactions auto-categorize
+          </label>
           <div className="flex gap-2">
             <Button
               size="sm"
               disabled={pending || !category}
               onClick={() =>
                 startTransition(async () => {
-                  await editTransaction(tx.id, category, vendor || null, note || null);
+                  await editTransaction(
+                    tx.id,
+                    category,
+                    vendor || null,
+                    note || null,
+                    saveAsRule,
+                  );
                   setEditing(false);
                 })
               }

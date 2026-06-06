@@ -9,16 +9,15 @@ function find(txs: { description: string; amount: number }[], label: string) {
 }
 
 describe("Hana POS parser — XLSX", () => {
-  it("extracts the key summary lines", async () => {
+  it("extracts only the two accounting lines (net total + tax)", async () => {
     const txs = await hanaConnector.parse({
       kind: "file",
       path: XLSX_FILE,
       mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
-    expect(txs.length).toBeGreaterThan(0);
+    // Only Net Total Sales + Sales Tax — no overlapping summary lines.
+    expect(txs.length).toBe(2);
     expect(find(txs, "Net Total Sales")?.amount).toBeCloseTo(54439.28, 2);
-    expect(find(txs, "Net Taxable Sales")?.amount).toBeCloseTo(48032.0, 2);
-    expect(find(txs, "Net Non Taxable Sales")?.amount).toBeCloseTo(6407.28, 2);
   });
 
   it("captures sales tax charged", async () => {

@@ -77,19 +77,34 @@ export async function acceptSuggestion(txId: string) {
   return { ok: true, message: "Accepted." };
 }
 
-/** Edit category/vendor for a single transaction and approve it. */
+/** Derive a stable rule pattern from a transaction description (first
+ * meaningful merchant token — strips dates, ids, trailing numbers). */
+function patternFromDescription(desc: string): string {
+  // take the leading words up to the first long number / id
+  const cleaned = desc
+    .replace(/\d{2}\/\d{2}(\/\d{2,4})?/g, " ") // dates
+    .replace(/\b\d{6,}\b/g, " ") // long ids
+    .trim();
+  const words = cleaned.split(/\s+/).filter(Boolean).slice(0, 3);
+  return words.join(" ").slice(0, 40);
+}
+
+/** Edit category/vendor for a single transaction and approve it.
+ * If saveAsRule, also create a vendor-match rule so future transactions
+ * matching this merchant auto-categorize. */
 export async function editTransaction(
   txId: string,
   category: string,
   vendor: string | null,
   note: string | null,
+  saveAsRule = false,
 ) {
   const { supabase, user } = await requireUser();
   if (!user) return { ok: false, message: "Not authenticated." };
 
   const { data: before } = await supabase
     .from("transactions")
-    .select("monthly_run_id, suggested_category")
+    .select("monthly_run_id, suggested_category, description")
     .eq("id", txId)
     .single();
 
@@ -111,8 +126,40 @@ export async function editTransaction(
     after_state: { category, vendor, note },
     user_id: user.id,
   });
+
+  let ruleMsg = "";
+  if (saveAsRule && before?.description) {
+    const pattern = patternFromDescription(before.description);
+    if (pattern) {
+      // avoid duplicate rule for the same pattern
+      const { data: existing } = await supabase
+        .from("rulebook_rules")
+        .select("id")
+        .eq("pattern", pattern)
+        .maybeSingle();
+      if (!existing) {
+        await supabase.from("rulebook_rules").insert({
+          rule_type: "vendor_match",
+          pattern,
+          category,
+          vendor,
+          priority: 50,
+          notes: "Created from a reviewed transaction",
+        });
+        await supabase.from("audit_log").insert({
+          action: "rule_created",
+          after_state: { pattern, category, vendor },
+          user_id: user.id,
+        });
+        ruleMsg = ` Rule added: "${pattern}" → ${category}.`;
+      } else {
+        ruleMsg = " (rule already exists)";
+      }
+    }
+  }
+
   revalidatePath("/dashboard");
-  return { ok: true, message: "Updated." };
+  return { ok: true, message: `Updated.${ruleMsg}` };
 }
 
 /** Skip a transaction (won't be posted). */
