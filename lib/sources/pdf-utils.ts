@@ -21,7 +21,6 @@ export async function extractWords(input: string | Buffer): Promise<Word[]> {
   const doc = await pdfjs.getDocument({
     data: bytes,
     useSystemFonts: true,
-    isEvalSupported: false,
   }).promise;
 
   const words: Word[] = [];
