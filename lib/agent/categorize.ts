@@ -45,7 +45,8 @@ Core principles:
 - confidence is 0-100: 90+ = clear rule match; 70-89 = likely; below 70 = uncertain/needs review.
 - Set matched_rule_id to the rule's id (e.g. "rule_3") when a rule applies, else null.
 
-Return one result per transaction, preserving each transaction's id as transaction_id.`;
+Return one result per transaction, preserving each transaction's id as transaction_id.
+Keep "reasoning" very short (one brief phrase, max ~10 words) to stay within output limits.`;
 
 /**
  * Categorize a batch of transactions against the rulebook using Claude.
@@ -60,6 +61,29 @@ export async function categorize(
   const client = new Anthropic();
   const rulesContext = buildRulesContext(rules);
 
+  // Batch to keep each response well under max_tokens. A single huge batch
+  // overflows the output limit and returns truncated (invalid) JSON.
+  const BATCH_SIZE = 40;
+  const results: Categorization[] = [];
+
+  for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
+    const batch = transactions.slice(i, i + BATCH_SIZE);
+    const batchResults = await categorizeBatch(
+      client,
+      batch,
+      rulesContext,
+    );
+    results.push(...batchResults);
+  }
+
+  return results;
+}
+
+async function categorizeBatch(
+  client: Anthropic,
+  transactions: TxWithId[],
+  rulesContext: string,
+): Promise<Categorization[]> {
   const txList = transactions
     .map(
       (t) =>
@@ -69,7 +93,7 @@ export async function categorize(
 
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 16000,
+    max_tokens: 8000,
     output_config: {
       effort: "low",
       format: {
@@ -82,7 +106,7 @@ export async function categorize(
       {
         type: "text",
         text: `RULEBOOK RULES:\n${rulesContext}`,
-        cache_control: { type: "ephemeral" }, // cache the large stable rules block
+        cache_control: { type: "ephemeral" }, // cached across batches (same rules)
       },
     ],
     messages: [
@@ -97,8 +121,7 @@ export async function categorize(
   if (!parsed) {
     throw new Error("Categorization returned no parseable output");
   }
-  const validated = CategorizationBatchSchema.parse(parsed);
-  return validated.results;
+  return CategorizationBatchSchema.parse(parsed).results;
 }
 
 /**

@@ -62,7 +62,7 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
           ) : (
             <div
               key={rule.id}
-              className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card p-3 text-sm"
+              className="flex items-center justify-between gap-4 rounded-xl glass glass-hover p-3 text-sm"
             >
               <div className="min-w-0 flex-1">
                 <span className="text-muted-foreground">
@@ -131,7 +131,7 @@ function RuleForm({
   const [priority, setPriority] = useState(initial?.priority ?? 50);
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
+    <div className="flex flex-col gap-2 rounded-xl glass p-3">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Input
           placeholder="Pattern (e.g. AMZN MKTPL)"

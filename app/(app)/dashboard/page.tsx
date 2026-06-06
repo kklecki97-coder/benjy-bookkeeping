@@ -1,13 +1,15 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createSSRClient } from "@/lib/supabase/ssr";
-import { signOut } from "./actions";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RunControls } from "@/components/run-controls";
 import { CategoryGroup, type GroupTx } from "@/components/category-group";
 import { ExceptionRow, type ExceptionTx } from "@/components/exception-row";
 import { PostBar } from "@/components/post-bar";
+import { StatCards, type RunStats } from "@/components/stat-cards";
+import { PipelineStatus } from "@/components/pipeline-status";
+import {
+  RevenueBySource,
+  type SourceRevenue,
+} from "@/components/revenue-by-source";
 
 function currentMonth(): string {
   // Static default; user can edit. Avoids Date.now() determinism concerns in tests.
@@ -16,10 +18,6 @@ function currentMonth(): string {
 
 export default async function DashboardPage() {
   const supabase = await createSSRClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   // most recent run
   const { data: run } = await supabase
@@ -31,6 +29,8 @@ export default async function DashboardPage() {
 
   let groups: { category: string; txs: GroupTx[] }[] = [];
   let exceptions: ExceptionTx[] = [];
+  let stats: RunStats = { total: 0, autoCategorized: 0, needReview: 0, revenue: 0 };
+  let revenueBySource: SourceRevenue[] = [];
 
   if (run) {
     const { data: txs } = await supabase
@@ -40,10 +40,30 @@ export default async function DashboardPage() {
       )
       .eq("monthly_run_id", run.id);
 
-    const auto = (txs ?? []).filter(
+    const all = txs ?? [];
+    const auto = all.filter(
       (t) => t.status === "auto_approved" || t.status === "manually_approved",
     );
-    const exc = (txs ?? []).filter((t) => t.status === "pending");
+    const exc = all.filter((t) => t.status === "pending");
+
+    // stats
+    stats = {
+      total: all.length,
+      autoCategorized: auto.length,
+      needReview: exc.length,
+      revenue: all.reduce((s, t) => s + Math.max(0, Number(t.amount)), 0),
+    };
+
+    // revenue by source (positive amounts)
+    const revMap = new Map<string, number>();
+    for (const t of all) {
+      const amt = Number(t.amount);
+      if (amt > 0) revMap.set(t.source, (revMap.get(t.source) ?? 0) + amt);
+    }
+    revenueBySource = [...revMap.entries()].map(([source, amount]) => ({
+      source,
+      amount,
+    }));
 
     const byCategory = new Map<string, GroupTx[]>();
     for (const t of auto) {
@@ -80,51 +100,38 @@ export default async function DashboardPage() {
     .filter((t) => t.status === "manually_approved").length;
 
   return (
-    <main className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Towers Flowers — Monthly Close
-            </h1>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/settings">
-              <Button variant="outline" size="sm">
-                Settings
-              </Button>
-            </Link>
-            <Link href="/history">
-              <Button variant="outline" size="sm">
-                History
-              </Button>
-            </Link>
-            <form action={signOut}>
-              <Button variant="outline" size="sm">
-                Sign out
-              </Button>
-            </form>
-          </div>
-        </header>
+    <>
+      <header className="mb-8">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+          Monthly Close
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Upload sources, review, and post to QuickBooks.
+        </p>
+      </header>
 
-        <div className="mb-8">
-          <RunControls defaultMonth={currentMonth()} />
-        </div>
+      <div className="mb-8">
+        <RunControls defaultMonth={currentMonth()} />
+      </div>
 
-        {run ? (
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-medium">
-                Review — {run.month_year}{" "}
-                <span className="text-sm text-muted-foreground">({run.status})</span>
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {autoCount} auto-categorized · {exceptions.length} need review
-              </p>
-            </div>
+      {run ? (
+        <section className="flex flex-col gap-6">
+          <StatCards stats={stats} />
 
-            <Tabs defaultValue="auto">
+          <PipelineStatus status={run.status} />
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="font-heading text-lg font-medium">
+                  Review — {run.month_year}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {autoCount} auto · {exceptions.length} to review
+                </p>
+              </div>
+
+              <Tabs defaultValue="auto">
               <TabsList>
                 <TabsTrigger value="auto">Auto-categorized ({autoCount})</TabsTrigger>
                 <TabsTrigger value="exceptions">
@@ -147,25 +154,33 @@ export default async function DashboardPage() {
                 )}
               </TabsContent>
 
-              <TabsContent value="exceptions" className="mt-4 flex flex-col gap-3">
-                {exceptions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No exceptions — everything categorized cleanly.
-                  </p>
-                ) : (
-                  exceptions.map((tx) => <ExceptionRow key={tx.id} tx={tx} />)
-                )}
-              </TabsContent>
-            </Tabs>
+                <TabsContent
+                  value="exceptions"
+                  className="mt-4 flex flex-col gap-3"
+                >
+                  {exceptions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No exceptions — everything categorized cleanly.
+                    </p>
+                  ) : (
+                    exceptions.map((tx) => <ExceptionRow key={tx.id} tx={tx} />)
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
 
-            <PostBar runId={run.id} readyCount={readyCount} />
-          </section>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No runs yet. Upload source files above to start your first close.
+            <div className="lg:col-span-1">
+              <RevenueBySource data={revenueBySource} />
+            </div>
+          </div>
+
+          <PostBar runId={run.id} readyCount={readyCount} />
+        </section>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          No runs yet. Upload source files above to start your first close.
           </p>
         )}
-      </div>
-    </main>
+    </>
   );
 }

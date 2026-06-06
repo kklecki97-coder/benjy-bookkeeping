@@ -31,7 +31,7 @@ export function CategoryGroup({ runId, category, transactions }: CategoryGroupPr
   const allApproved = transactions.every((t) => t.status === "manually_approved");
 
   return (
-    <div className="rounded-lg border border-border bg-card">
+    <div className="rounded-xl glass glass-hover">
       <div className="flex items-center justify-between gap-4 p-4">
         <button
           onClick={() => setOpen((o) => !o)}

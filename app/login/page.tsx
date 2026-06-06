@@ -16,10 +16,12 @@ export default function LoginPage() {
   const [state, formAction, pending] = useActionState(login, null);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-4">
+    <main className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Towers Flowers</CardTitle>
+          <CardTitle className="font-heading text-2xl tracking-tight">
+            Towers Flowers
+          </CardTitle>
           <CardDescription>Sign in to the bookkeeping dashboard</CardDescription>
         </CardHeader>
         <CardContent>

@@ -25,7 +25,7 @@ export function PostBar({
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="sticky bottom-0 mt-6 flex items-center justify-between rounded-lg border border-border bg-card p-4">
+    <div className="sticky bottom-0 mt-6 flex items-center justify-between rounded-xl glass p-4">
       <p className="text-sm text-muted-foreground">
         {readyCount} transactions ready to post.{" "}
         {message && <span className="text-foreground">{message}</span>}

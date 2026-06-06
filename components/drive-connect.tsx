@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
  */
 export function DriveConnect() {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-border bg-card p-4">
+    <div className="flex items-center justify-between rounded-xl glass p-4">
       <div>
         <p className="text-sm font-medium">
           Google Drive{" "}
