@@ -5,6 +5,7 @@ export interface PostableTx {
   id: string;
   amount: number;
   approved_category: string | null;
+  suggested_category?: string | null;
   description: string;
 }
 
@@ -110,7 +111,9 @@ export async function postTransactions(
 
   const { data: txs } = await supabase
     .from("transactions")
-    .select("id, amount, approved_category, description, status, qbo_journal_entry_id")
+    .select(
+      "id, amount, approved_category, suggested_category, description, status, qbo_journal_entry_id",
+    )
     .eq("monthly_run_id", runId);
 
   const result: PostResult = { posted: 0, failed: 0, errors: [] };
@@ -118,7 +121,9 @@ export async function postTransactions(
   for (const tx of (txs ?? []) as PostRow[]) {
     if (!shouldPost(tx)) continue;
 
-    const category = (tx.approved_category ?? "").toLowerCase().trim();
+    // Auto-approved transactions carry only suggested_category; fall back to it.
+    const effectiveCategory = tx.approved_category ?? tx.suggested_category;
+    const category = (effectiveCategory ?? "").toLowerCase().trim();
     const expenseAccount = accounts.get(category);
     const bank = accounts.get("checking") || accounts.get("bank");
 
@@ -126,13 +131,13 @@ export async function postTransactions(
       result.failed++;
       result.errors.push({
         txId: tx.id,
-        error: `No QBO account for "${tx.approved_category}"`,
+        error: `No QBO account for "${effectiveCategory}"`,
       });
       await supabase
         .from("transactions")
         .update({
           status: "post_failed",
-          qbo_post_error: `No matching QBO account: ${tx.approved_category}`,
+          qbo_post_error: `No matching QBO account: ${effectiveCategory}`,
         })
         .eq("id", tx.id);
       continue;

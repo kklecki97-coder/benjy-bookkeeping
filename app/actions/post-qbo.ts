@@ -94,7 +94,9 @@ export async function postToQbo(
     await supabase
       .from("monthly_runs")
       .update({
-        status: result.failed > 0 ? "error" : "complete",
+        // "error" only if nothing posted at all; partial success is "complete"
+        // (failures sit in the retry queue, not a hard failure).
+        status: result.posted === 0 && result.failed > 0 ? "error" : "complete",
         completed_at: new Date().toISOString(),
       })
       .eq("id", runId);
