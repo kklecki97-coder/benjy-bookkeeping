@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { RulesTable, type Rule } from "@/components/rules-table";
 import { QboConnect } from "@/components/qbo-connect";
+import { DriveConnect } from "@/components/drive-connect";
 
 export default async function SettingsPage() {
   const supabase = await createSSRClient();
@@ -47,11 +48,12 @@ export default async function SettingsPage() {
           </Link>
         </header>
 
-        <div className="mb-6">
+        <div className="mb-6 flex flex-col gap-3">
           <QboConnect
             connected={!!qbo}
             environment={qbo?.environment ?? "sandbox"}
           />
+          <DriveConnect />
         </div>
 
         <Card>
