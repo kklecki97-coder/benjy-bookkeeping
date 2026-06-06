@@ -83,8 +83,9 @@ export function groupRowsByY(words: Word[], tolerance = 3): Word[][] {
 }
 
 /** Parse a currency token like "$1,203.05" or "-$57.01" → number, or null. */
-export function parseAmount(token: string): number | null {
-  const cleaned = token.replace(/[$,\s]/g, "");
+export function parseAmount(token: string | null | undefined): number | null {
+  if (token == null) return null;
+  const cleaned = String(token).replace(/[$,\s]/g, "");
   // must look like a number (optionally negative, with decimals)
   if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return null;
   const n = parseFloat(cleaned);
