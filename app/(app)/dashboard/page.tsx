@@ -20,6 +20,13 @@ function currentMonth(): string {
 export default async function DashboardPage() {
   const supabase = await createSSRClient();
 
+  const { data: drive } = await supabase
+    .from("drive_connection")
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+  const driveConnected = !!drive;
+
   // most recent run
   const { data: run } = await supabase
     .from("monthly_runs")
@@ -114,16 +121,23 @@ export default async function DashboardPage() {
         </p>
       </header>
 
+      {/* Current-month summary up top once a run exists */}
+      {run && (
+        <div className="mb-8 flex flex-col gap-4">
+          <StatCards stats={stats} />
+          <PipelineStatus status={run.status} />
+        </div>
+      )}
+
       <div className="mb-8">
-        <RunControls defaultMonth={currentMonth()} />
+        <RunControls
+          defaultMonth={currentMonth()}
+          driveConnected={driveConnected}
+        />
       </div>
 
       {run ? (
         <section className="flex flex-col gap-6">
-          <StatCards stats={stats} />
-
-          <PipelineStatus status={run.status} />
-
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <div className="mb-4 flex items-center justify-between">

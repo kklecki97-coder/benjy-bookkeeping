@@ -24,6 +24,12 @@ export default async function SettingsPage() {
     .limit(1)
     .maybeSingle();
 
+  const { data: drive } = await supabase
+    .from("drive_connection")
+    .select("folder_id")
+    .limit(1)
+    .maybeSingle();
+
   return (
     <>
       <header className="mb-8">
@@ -37,7 +43,7 @@ export default async function SettingsPage() {
 
       <div className="mb-6 flex flex-col gap-3">
         <QboConnect connected={!!qbo} environment={qbo?.environment ?? "sandbox"} />
-        <DriveConnect />
+        <DriveConnect connected={!!drive} folderId={drive?.folder_id ?? null} />
       </div>
 
       <Card>

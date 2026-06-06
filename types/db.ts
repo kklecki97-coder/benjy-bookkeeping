@@ -69,6 +69,39 @@ export type Database = {
           },
         ]
       }
+      drive_connection: {
+        Row: {
+          access_expires_at: string | null
+          access_token: string | null
+          account_email: string | null
+          created_at: string
+          folder_id: string | null
+          id: string
+          refresh_token_enc: string
+          updated_at: string
+        }
+        Insert: {
+          access_expires_at?: string | null
+          access_token?: string | null
+          account_email?: string | null
+          created_at?: string
+          folder_id?: string | null
+          id?: string
+          refresh_token_enc: string
+          updated_at?: string
+        }
+        Update: {
+          access_expires_at?: string | null
+          access_token?: string | null
+          account_email?: string | null
+          created_at?: string
+          folder_id?: string | null
+          id?: string
+          refresh_token_enc?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       monthly_runs: {
         Row: {
           completed_at: string | null

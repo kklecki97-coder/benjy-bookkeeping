@@ -1,33 +1,35 @@
 import "server-only";
 import type { DriveConnector, DriveFile } from "./types";
+import { getValidAccessToken, isConnected as connCheck } from "./oauth";
 
-/**
- * SCAFFOLD implementation. Methods throw "not configured" until the Google
- * Drive integration is wired up (OAuth + fetch). This keeps the orchestrator
- * and UI buildable now; we flip the implementation on once the client confirms
- * the integration method.
- *
- * To wire up (OAuth + Folder ID path):
- *  1. Create a Google Cloud project + OAuth client (Drive API scope:
- *     https://www.googleapis.com/auth/drive.readonly).
- *  2. Add GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI to env.
- *  3. Implement /api/drive/connect + /api/drive/callback (mirror the QBO flow
- *     in lib/qbo/oauth.ts — store encrypted refresh token in drive_connection).
- *  4. Implement listFiles/downloadFile via the Drive v3 REST API:
- *       GET /drive/v3/files?q='<folderId>' in parents
- *       GET /drive/v3/files/{id}?alt=media
- */
-const NOT_CONFIGURED =
-  "Google Drive is not connected yet. Use file upload, or connect Drive in Settings.";
+const API = "https://www.googleapis.com/drive/v3";
 
 export const driveConnector: DriveConnector = {
   async isConnected() {
-    return false; // flip once token storage exists
+    return connCheck();
   },
-  async listFiles(_folderId: string): Promise<DriveFile[]> {
-    throw new Error(NOT_CONFIGURED);
+
+  async listFiles(folderId: string): Promise<DriveFile[]> {
+    const token = await getValidAccessToken();
+    const q = encodeURIComponent(
+      `'${folderId}' in parents and trashed = false`,
+    );
+    const res = await fetch(
+      `${API}/files?q=${q}&fields=files(id,name,mimeType)&pageSize=100`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) throw new Error(`Drive list failed: ${res.status}`);
+    const body = (await res.json()) as { files?: DriveFile[] };
+    return body.files ?? [];
   },
-  async downloadFile(_fileId: string): Promise<Buffer> {
-    throw new Error(NOT_CONFIGURED);
+
+  async downloadFile(fileId: string): Promise<Buffer> {
+    const token = await getValidAccessToken();
+    const res = await fetch(`${API}/files/${fileId}?alt=media`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Drive download failed: ${res.status}`);
+    const arrayBuf = await res.arrayBuffer();
+    return Buffer.from(arrayBuf);
   },
 };

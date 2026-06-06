@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { runClose } from "@/app/actions/run-close";
+import { runFromDrive } from "@/app/actions/drive";
+import { RunProgress } from "@/components/run-progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,7 +14,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export function RunControls({ defaultMonth }: { defaultMonth: string }) {
+export function RunControls({
+  defaultMonth,
+  driveConnected = false,
+}: {
+  defaultMonth: string;
+  driveConnected?: boolean;
+}) {
   const [month, setMonth] = useState(defaultMonth);
   const [files, setFiles] = useState<FileList | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -28,6 +36,14 @@ export function RunControls({ defaultMonth }: { defaultMonth: string }) {
     startTransition(async () => {
       setMessage(null);
       const result = await runClose(month, formData);
+      setMessage(result.message);
+    });
+  }
+
+  function onRunFromDrive() {
+    startTransition(async () => {
+      setMessage("Pulling from Google Drive…");
+      const result = await runFromDrive(month);
       setMessage(result.message);
     });
   }
@@ -55,10 +71,25 @@ export function RunControls({ defaultMonth }: { defaultMonth: string }) {
             onChange={(e) => setFiles(e.target.files)}
           />
         </div>
-        <Button onClick={onRun} disabled={pending}>
-          {pending ? "Processing…" : "Run Monthly Close"}
-        </Button>
-        {message && <p className="text-sm text-muted-foreground">{message}</p>}
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button onClick={onRun} disabled={pending} className="flex-1">
+            {pending ? "Processing…" : "Run from uploaded files"}
+          </Button>
+          {driveConnected && (
+            <Button
+              onClick={onRunFromDrive}
+              disabled={pending}
+              variant="outline"
+              className="flex-1"
+            >
+              {pending ? "Processing…" : "Run from Google Drive"}
+            </Button>
+          )}
+        </div>
+        {pending && <RunProgress />}
+        {!pending && message && (
+          <p className="text-sm text-muted-foreground">{message}</p>
+        )}
       </CardContent>
     </Card>
   );

@@ -95,7 +95,10 @@ export async function runMonthlyClose(
   if (rows.length > 0) {
     const { error: insErr } = await supabase
       .from("transactions")
-      .upsert(rows, { onConflict: "source,external_id", ignoreDuplicates: true });
+      .upsert(rows, {
+        onConflict: "monthly_run_id,source,external_id",
+        ignoreDuplicates: true,
+      });
     if (insErr) throw new Error(`Failed to insert transactions: ${insErr.message}`);
   }
 
