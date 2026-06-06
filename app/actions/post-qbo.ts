@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { postTransactions } from "@/lib/qbo/post";
 import { isConnected } from "@/lib/qbo/oauth";
 import { sendSummaryEmail, type SummaryData } from "@/lib/email/summary";
+import { countsAsRevenue } from "@/lib/agent/revenue";
 
 const SOURCE_LABELS: Record<string, string> = {
   hana: "Hana POS",
@@ -28,21 +29,19 @@ async function buildSummary(
     .single();
   const { data: txs } = await supabase
     .from("transactions")
-    .select("source, amount, approved_category, status")
+    .select("source, amount, approved_category, description, status")
     .eq("monthly_run_id", runId);
 
   const all = txs ?? [];
   const auto = all.filter((t) => t.status === "auto_approved").length;
   const reviewed = all.filter((t) => t.status === "manually_approved").length;
 
-  // revenue (positive amounts) by source
+  // revenue = sales from each channel's own source (see countsAsRevenue)
   const revBySource = new Map<string, number>();
   for (const t of all) {
-    const amt = Number(t.amount);
-    if (amt > 0) {
-      const label = SOURCE_LABELS[t.source] ?? t.source;
-      revBySource.set(label, (revBySource.get(label) ?? 0) + amt);
-    }
+    if (!countsAsRevenue(t)) continue;
+    const label = SOURCE_LABELS[t.source] ?? t.source;
+    revBySource.set(label, (revBySource.get(label) ?? 0) + Math.abs(Number(t.amount)));
   }
   // top expenses (negative amounts) by category
   const expByCat = new Map<string, number>();

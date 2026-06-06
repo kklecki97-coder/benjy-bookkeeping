@@ -10,6 +10,7 @@ import {
   RevenueBySource,
   type SourceRevenue,
 } from "@/components/revenue-by-source";
+import { countsAsRevenue } from "@/lib/agent/revenue";
 
 function currentMonth(): string {
   // Static default; user can edit. Avoids Date.now() determinism concerns in tests.
@@ -46,19 +47,22 @@ export default async function DashboardPage() {
     );
     const exc = all.filter((t) => t.status === "pending");
 
+    // Revenue = sales from each channel's own source file (not bank-deposit
+    // mirrors, not overlapping Hana summary lines). See countsAsRevenue.
+    const revenueTxs = all.filter(countsAsRevenue);
+
     // stats
     stats = {
       total: all.length,
       autoCategorized: auto.length,
       needReview: exc.length,
-      revenue: all.reduce((s, t) => s + Math.max(0, Number(t.amount)), 0),
+      revenue: revenueTxs.reduce((s, t) => s + Math.abs(Number(t.amount)), 0),
     };
 
-    // revenue by source (positive amounts)
+    // revenue by source (sales categories only)
     const revMap = new Map<string, number>();
-    for (const t of all) {
-      const amt = Number(t.amount);
-      if (amt > 0) revMap.set(t.source, (revMap.get(t.source) ?? 0) + amt);
+    for (const t of revenueTxs) {
+      revMap.set(t.source, (revMap.get(t.source) ?? 0) + Math.abs(Number(t.amount)));
     }
     revenueBySource = [...revMap.entries()].map(([source, amount]) => ({
       source,
