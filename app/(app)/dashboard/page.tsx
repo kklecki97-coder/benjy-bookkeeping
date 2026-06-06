@@ -106,9 +106,15 @@ export default async function DashboardPage() {
   }
 
   const autoCount = groups.reduce((s, g) => s + g.txs.length, 0);
-  const readyCount = groups
-    .flatMap((g) => g.txs)
-    .filter((t) => t.status === "manually_approved").length;
+  const allGroupTxs = groups.flatMap((g) => g.txs);
+  // approved & ready to post
+  const readyCount = allGroupTxs.filter(
+    (t) => t.status === "manually_approved",
+  ).length;
+  // auto-categorized still awaiting the owner's confirmation
+  const pendingAutoCount = allGroupTxs.filter(
+    (t) => t.status === "auto_approved",
+  ).length;
 
   return (
     <>
@@ -192,7 +198,11 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <PostBar runId={run.id} readyCount={readyCount} />
+          <PostBar
+            runId={run.id}
+            readyCount={readyCount}
+            autoCount={pendingAutoCount}
+          />
         </section>
       ) : (
         <p className="text-sm text-muted-foreground">

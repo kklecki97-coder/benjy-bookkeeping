@@ -11,6 +11,40 @@ async function requireUser() {
   return { supabase, user };
 }
 
+/** Approve ALL auto-categorized transactions in a run in one click
+ * (owner confirms they trust the AI's suggestions). Copies suggested→approved
+ * and flips status to manually_approved so they become eligible to post. */
+export async function approveAllAuto(runId: string) {
+  const { supabase, user } = await requireUser();
+  if (!user) return { ok: false, message: "Not authenticated." };
+
+  const { data: txs } = await supabase
+    .from("transactions")
+    .select("id, suggested_category, suggested_vendor")
+    .eq("monthly_run_id", runId)
+    .eq("status", "auto_approved");
+
+  for (const t of txs ?? []) {
+    await supabase
+      .from("transactions")
+      .update({
+        status: "manually_approved",
+        approved_category: t.suggested_category,
+        approved_vendor: t.suggested_vendor,
+        approved_at: new Date().toISOString(),
+      })
+      .eq("id", t.id);
+  }
+  await supabase.from("audit_log").insert({
+    monthly_run_id: runId,
+    action: "approved_all_auto",
+    after_state: { count: txs?.length ?? 0 },
+    user_id: user.id,
+  });
+  revalidatePath("/dashboard");
+  return { ok: true, message: `Approved ${txs?.length ?? 0} auto-categorized.` };
+}
+
 /** Approve every pending/auto transaction in a category for a run. */
 export async function approveCategory(runId: string, category: string) {
   const { supabase, user } = await requireUser();

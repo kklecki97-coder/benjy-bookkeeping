@@ -7,6 +7,7 @@ export interface PostableTx {
   approved_category: string | null;
   suggested_category?: string | null;
   description: string;
+  date?: string | null; // ISO yyyy-mm-dd — becomes the journal entry's TxnDate
 }
 
 export interface JournalAccounts {
@@ -27,6 +28,7 @@ interface JournalLine {
 export interface JournalEntry {
   Line: JournalLine[];
   PrivateNote?: string;
+  TxnDate?: string; // yyyy-mm-dd — posts the entry into the period it occurred
 }
 
 /**
@@ -63,7 +65,14 @@ export function buildJournalEntry(
       },
     },
   };
-  return { Line: [debit, credit], PrivateNote: `txid:${tx.id}` };
+  const je: JournalEntry = {
+    Line: [debit, credit],
+    PrivateNote: `txid:${tx.id}`,
+  };
+  // Stamp the period the transaction occurred in. Without this QBO defaults
+  // TxnDate to "today" (the post date), pushing e.g. April expenses into June.
+  if (tx.date) je.TxnDate = tx.date;
+  return je;
 }
 
 /** Idempotency + eligibility guard: should this transaction be posted now? */
@@ -72,7 +81,10 @@ export function shouldPost(tx: {
   qbo_journal_entry_id: string | null;
 }): boolean {
   if (tx.qbo_journal_entry_id) return false; // already posted
-  return ["manually_approved", "auto_approved", "post_failed"].includes(tx.status);
+  // Only owner-approved transactions post to QBO (rulebook: explicit approval
+  // required). auto_approved must be confirmed via "Approve all" first.
+  // post_failed is eligible for retry (it was approved before).
+  return ["manually_approved", "post_failed"].includes(tx.status);
 }
 
 export interface PostResult {
@@ -103,6 +115,7 @@ export async function postTransactions(
   interface PostRowLocal extends PostableTx {
     status: string;
     qbo_journal_entry_id: string | null;
+    transaction_date: string | null;
   }
   type PostRow = PostRowLocal;
 
@@ -112,7 +125,7 @@ export async function postTransactions(
   const { data: txs } = await supabase
     .from("transactions")
     .select(
-      "id, amount, approved_category, suggested_category, description, status, qbo_journal_entry_id",
+      "id, amount, approved_category, suggested_category, description, status, qbo_journal_entry_id, transaction_date",
     )
     .eq("monthly_run_id", runId);
 
@@ -143,10 +156,13 @@ export async function postTransactions(
       continue;
     }
 
-    const je = buildJournalEntry(tx, {
-      expenseAccountId: expenseAccount.Id,
-      bankAccountId: bank.Id,
-    });
+    const je = buildJournalEntry(
+      { ...tx, date: tx.transaction_date },
+      {
+        expenseAccountId: expenseAccount.Id,
+        bankAccountId: bank.Id,
+      },
+    );
 
     try {
       const res = await postWithBackoff(realmId, token, je);
