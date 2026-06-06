@@ -110,6 +110,39 @@ export type Database = {
           },
         ]
       }
+      qbo_connection: {
+        Row: {
+          access_expires_at: string | null
+          access_token: string | null
+          created_at: string
+          environment: string
+          id: string
+          realm_id: string
+          refresh_token_enc: string
+          updated_at: string
+        }
+        Insert: {
+          access_expires_at?: string | null
+          access_token?: string | null
+          created_at?: string
+          environment?: string
+          id?: string
+          realm_id: string
+          refresh_token_enc: string
+          updated_at?: string
+        }
+        Update: {
+          access_expires_at?: string | null
+          access_token?: string | null
+          created_at?: string
+          environment?: string
+          id?: string
+          realm_id?: string
+          refresh_token_enc?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       rulebook_rules: {
         Row: {
           category: string | null

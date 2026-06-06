@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RunControls } from "@/components/run-controls";
 import { CategoryGroup, type GroupTx } from "@/components/category-group";
 import { ExceptionRow, type ExceptionTx } from "@/components/exception-row";
+import { PostBar } from "@/components/post-bar";
 
 function currentMonth(): string {
   // Static default; user can edit. Avoids Date.now() determinism concerns in tests.
@@ -74,6 +75,9 @@ export default async function DashboardPage() {
   }
 
   const autoCount = groups.reduce((s, g) => s + g.txs.length, 0);
+  const readyCount = groups
+    .flatMap((g) => g.txs)
+    .filter((t) => t.status === "manually_approved").length;
 
   return (
     <main className="min-h-screen bg-background p-6">
@@ -153,6 +157,8 @@ export default async function DashboardPage() {
                 )}
               </TabsContent>
             </Tabs>
+
+            <PostBar runId={run.id} readyCount={readyCount} />
           </section>
         ) : (
           <p className="text-sm text-muted-foreground">

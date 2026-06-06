@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { RulesTable, type Rule } from "@/components/rules-table";
+import { QboConnect } from "@/components/qbo-connect";
 
 export default async function SettingsPage() {
   const supabase = await createSSRClient();
@@ -22,6 +23,12 @@ export default async function SettingsPage() {
     .from("rulebook_rules")
     .select("id, rule_type, pattern, category, vendor, priority")
     .order("priority", { ascending: true });
+
+  const { data: qbo } = await supabase
+    .from("qbo_connection")
+    .select("environment")
+    .limit(1)
+    .maybeSingle();
 
   return (
     <main className="min-h-screen bg-background p-6">
@@ -39,6 +46,13 @@ export default async function SettingsPage() {
             </Button>
           </Link>
         </header>
+
+        <div className="mb-6">
+          <QboConnect
+            connected={!!qbo}
+            environment={qbo?.environment ?? "sandbox"}
+          />
+        </div>
 
         <Card>
           <CardHeader>
