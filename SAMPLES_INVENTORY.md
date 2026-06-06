@@ -28,6 +28,9 @@ Folder: `benjy-bookkeeping/samples/`. Wszystkie PDF text-based (zero OCR — pot
 Income: Shopify Sales/Returns/Shipping, Hana Sales/Discounts/Shipping, Honeybook Sales, Retail Sales.
 COGS: Cost of goods sold. Expenses: Bank Fees, Hana Wire Fee, Honeybook Fees, Shopify Fees, Commissions & fees, Contract labor, Insurance, Interest paid, Accounting fees, Meals, Office supplies, Rent, Small tools & equipment, Software & apps, Utilities (Electricity/Internet & TV/Janitorial), Payroll (Fees/Taxes/Salaries & wages), Taxis or shared rides.
 
+## Wnioski z budowy parserow (aktualizowane)
+- **HoneyBook Payments CSV ma wiersz TOTALU na koncu** (puste COMPANY/CLIENT/INVOICE, NET_AMOUNT = suma reszty). Parser MUSI go pomijac (filtr po INVOICE/CLIENT_INFO). April: 21 prawdziwych tx, suma NET $25,770.63. Dotyczy tez raportu majowego — uwazac.
+
 ## Kluczowe wnioski dla budowy
 1. **Format drift**: Hana raz XLSX raz PDF — parser musi obsłużyć oba (lub poprosić o spójny format).
 2. **PDF -layout problem**: kwoty BoA odrywają się od opisu — parser nie może zakładać "kwota na końcu linii opisu". Trzeba parsować przez pozycje/koordynaty (pdfplumber words+bbox) zamiast czystego tekstu liniowego.
