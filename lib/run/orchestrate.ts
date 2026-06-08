@@ -54,11 +54,26 @@ export async function runMonthlyClose(
   if (runErr || !run) throw new Error(`Failed to create run: ${runErr?.message}`);
   const runId = run.id;
 
+  // Shopify is API-based (no file to upload), so it's auto-included whenever
+  // credentials are configured — pulled for the same month, alongside whatever
+  // files/Drive sources were passed in. Skip if the caller already added it.
+  const effectiveSources = [...sources];
+  const shopifyConfigured =
+    !!process.env.SHOPIFY_STORE_DOMAIN &&
+    !!process.env.SHOPIFY_CLIENT_ID &&
+    !!process.env.SHOPIFY_CLIENT_SECRET;
+  if (shopifyConfigured && !effectiveSources.some((s) => s.source === "shopify")) {
+    effectiveSources.push({
+      source: "shopify",
+      input: { kind: "api", monthYear },
+    });
+  }
+
   // --- parse all sources, isolated per source ---
   const sourceSummary: RunResult["sourceSummary"] = {};
   const allTx: NormalizedTransaction[] = [];
 
-  for (const { source, input } of sources) {
+  for (const { source, input } of effectiveSources) {
     try {
       const connector = CONNECTORS[source];
       const txs = await connector.parse(input);

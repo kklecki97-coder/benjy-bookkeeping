@@ -18,10 +18,12 @@ import {
 export function RunControls({
   defaultMonth,
   driveConnected = false,
+  shopifyConnected = false,
   hasRun = false,
 }: {
   defaultMonth: string;
   driveConnected?: boolean;
+  shopifyConnected?: boolean;
   hasRun?: boolean;
 }) {
   const [month, setMonth] = useState(defaultMonth);
@@ -33,12 +35,16 @@ export function RunControls({
   const [pending, startTransition] = useTransition();
 
   function onRun() {
-    if (!files || files.length === 0) {
+    // Files are optional when Shopify is connected — the run will still pull
+    // Shopify (API) for the month. Only require files otherwise.
+    if ((!files || files.length === 0) && !shopifyConnected) {
       setMessage("Select source files first.");
       return;
     }
     const formData = new FormData();
-    for (const f of Array.from(files)) formData.append("files", f);
+    if (files) {
+      for (const f of Array.from(files)) formData.append("files", f);
+    }
     startTransition(async () => {
       setMessage(null);
       const result = await runClose(month, formData);
@@ -124,6 +130,12 @@ export function RunControls({
             </Button>
           )}
         </div>
+        {shopifyConnected && (
+          <p className="text-xs text-muted-foreground">
+            Shopify is connected — orders for this month are pulled
+            automatically, with or without uploaded files.
+          </p>
+        )}
         {pending && <RunProgress />}
         {!pending && message && (
           <p className="text-sm text-muted-foreground">{message}</p>

@@ -140,6 +140,11 @@ export default async function DashboardPage() {
         <RunControls
           defaultMonth={currentMonth()}
           driveConnected={driveConnected}
+          shopifyConnected={
+            !!process.env.SHOPIFY_STORE_DOMAIN &&
+            !!process.env.SHOPIFY_CLIENT_ID &&
+            !!process.env.SHOPIFY_CLIENT_SECRET
+          }
           hasRun={!!run}
         />
       </div>
