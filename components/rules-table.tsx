@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ChevronDown } from "lucide-react";
 import { createRule, updateRule, deleteRule } from "@/app/actions/rules";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +16,19 @@ export interface Rule {
   priority: number;
 }
 
+const COLLAPSED_COUNT = 3;
+
 export function RulesTable({ rules }: { rules: Rule[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  // Show everything while editing/adding (the edited rule may be past the fold);
+  // otherwise collapse to the first COLLAPSED_COUNT.
+  const forceShowAll = expanded || adding || editingId !== null;
+  const hasMore = rules.length > COLLAPSED_COUNT;
+  const visibleRules = forceShowAll ? rules : rules.slice(0, COLLAPSED_COUNT);
 
   return (
     <div className="flex flex-col gap-4">
@@ -45,7 +55,7 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
       )}
 
       <div className="flex flex-col gap-2">
-        {rules.map((rule) =>
+        {visibleRules.map((rule) =>
           editingId === rule.id ? (
             <RuleForm
               key={rule.id}
@@ -77,9 +87,6 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
                   </Badge>
                 )}
               </div>
-              <span className="text-xs text-muted-foreground">
-                priority {rule.priority}
-              </span>
               <div className="flex gap-1">
                 <Button
                   size="sm"
@@ -105,6 +112,21 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
           ),
         )}
       </div>
+
+      {hasMore && !adding && editingId === null && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex cursor-pointer items-center justify-center gap-1 rounded-lg py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-expanded={expanded}
+        >
+          {expanded ? "Show less" : `Show all ${rules.length} rules`}
+          <ChevronDown
+            className={`size-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+      )}
     </div>
   );
 }
@@ -128,32 +150,47 @@ function RuleForm({
   const [pattern, setPattern] = useState(initial?.pattern ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
   const [vendor, setVendor] = useState(initial?.vendor ?? "");
-  const [priority, setPriority] = useState(initial?.priority ?? 50);
+  // Priority is an internal ordering concept the owner shouldn't have to think
+  // about. Preserve an edited rule's existing priority; default new rules to 50
+  // (normal vendor match). Not shown in the form.
+  const priority = initial?.priority ?? 50;
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl glass p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <Input
-          placeholder="Pattern (e.g. AMZN MKTPL)"
-          value={pattern}
-          onChange={(e) => setPattern(e.target.value)}
-        />
-        <Input
-          placeholder="Category (e.g. Office supplies)"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-        />
-        <Input
-          placeholder="Vendor (optional)"
-          value={vendor}
-          onChange={(e) => setVendor(e.target.value)}
-        />
-        <Input
-          type="number"
-          placeholder="Priority"
-          value={priority}
-          onChange={(e) => setPriority(Number(e.target.value))}
-        />
+    <div className="flex flex-col gap-3 rounded-xl glass p-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="rule-pattern" className="text-xs text-muted-foreground">
+            When a transaction description contains
+          </label>
+          <Input
+            id="rule-pattern"
+            placeholder="e.g. AMZN MKTPL"
+            value={pattern}
+            onChange={(e) => setPattern(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="rule-category" className="text-xs text-muted-foreground">
+            Categorize it as
+          </label>
+          <Input
+            id="rule-category"
+            placeholder="e.g. Office supplies"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <label htmlFor="rule-vendor" className="text-xs text-muted-foreground">
+            Vendor name (optional)
+          </label>
+          <Input
+            id="rule-vendor"
+            placeholder="e.g. Amazon"
+            value={vendor}
+            onChange={(e) => setVendor(e.target.value)}
+          />
+        </div>
       </div>
       <div className="flex gap-2">
         <Button

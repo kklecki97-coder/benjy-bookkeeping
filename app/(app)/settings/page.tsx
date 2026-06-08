@@ -6,12 +6,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RulesTable, type Rule } from "@/components/rules-table";
 import { QboConnect } from "@/components/qbo-connect";
 import { DriveConnect } from "@/components/drive-connect";
+import { AccountCard } from "@/components/account-card";
 
 export default async function SettingsPage() {
   const supabase = await createSSRClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { data: rules } = await supabase
     .from("rulebook_rules")
@@ -37,28 +43,45 @@ export default async function SettingsPage() {
           Settings
         </h1>
         <p className="text-sm text-muted-foreground">
-          Integrations and categorization rules
+          Connections, categorization rules, and your account
         </p>
       </header>
 
-      <div className="mb-6 flex flex-col gap-3">
-        <QboConnect connected={!!qbo} environment={qbo?.environment ?? "sandbox"} />
-        <DriveConnect connected={!!drive} folderId={drive?.folder_id ?? null} />
-      </div>
+      <Tabs defaultValue="connections">
+        <TabsList>
+          <TabsTrigger value="connections">Connections</TabsTrigger>
+          <TabsTrigger value="rules">Rules</TabsTrigger>
+          <TabsTrigger value="account">Account</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Categorization Rules</CardTitle>
-          <CardDescription>
-            These rules tell the agent how to categorize transactions. Edit them
-            anytime — no engineer needed. Changes apply on your next monthly close,
-            and every change is logged.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RulesTable rules={(rules ?? []) as Rule[]} />
-        </CardContent>
-      </Card>
+        <TabsContent value="connections" className="mt-6 flex flex-col gap-3">
+          <QboConnect
+            connected={!!qbo}
+            environment={qbo?.environment ?? "sandbox"}
+          />
+          <DriveConnect connected={!!drive} folderId={drive?.folder_id ?? null} />
+        </TabsContent>
+
+        <TabsContent value="rules" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Categorization Rules</CardTitle>
+              <CardDescription>
+                These rules tell the agent how to categorize transactions. Edit
+                them anytime — no engineer needed. Changes apply on your next
+                monthly close, and every change is logged.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RulesTable rules={(rules ?? []) as Rule[]} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="account" className="mt-6">
+          <AccountCard email={user?.email ?? ""} />
+        </TabsContent>
+      </Tabs>
     </>
   );
 }

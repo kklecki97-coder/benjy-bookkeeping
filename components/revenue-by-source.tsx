@@ -1,9 +1,11 @@
+import { BarChart3 } from "lucide-react";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
 
 export interface SourceRevenue {
   source: string;
@@ -33,9 +35,12 @@ export function RevenueBySource({ data }: { data: SourceRevenue[] }) {
           <CardTitle className="text-base">Revenue by source</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            No revenue yet. Run a monthly close to see a breakdown by channel.
-          </p>
+          <EmptyState
+            icon={BarChart3}
+            title="No revenue yet"
+            hint="Run a monthly close to see a breakdown by channel."
+            className="border-0 bg-transparent py-6"
+          />
         </CardContent>
       </Card>
     );

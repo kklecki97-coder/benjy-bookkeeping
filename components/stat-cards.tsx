@@ -36,7 +36,7 @@ export function StatCards({ stats }: { stats: RunStats }) {
       label: "Need review",
       value: String(stats.needReview),
       icon: AlertTriangle,
-      tone: stats.needReview > 0 ? "text-amber-400" : "text-muted-foreground",
+      tone: stats.needReview > 0 ? "text-warning" : "text-muted-foreground",
     },
     {
       label: "Revenue",
@@ -47,7 +47,7 @@ export function StatCards({ stats }: { stats: RunStats }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {cards.map((c) => {
         const Icon = c.icon;
         return (

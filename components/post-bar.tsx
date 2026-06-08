@@ -113,8 +113,8 @@ export function PostBar({
               </div>
             ) : preview && preview.missing.length > 0 ? (
               <div className="flex flex-col gap-3 py-2">
-                <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-400" />
+                <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                   <div>
                     <p className="font-medium text-foreground">
                       {preview.missingCount}{" "}

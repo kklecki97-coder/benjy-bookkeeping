@@ -11,6 +11,8 @@ import {
   type SourceRevenue,
 } from "@/components/revenue-by-source";
 import { countsAsRevenue } from "@/lib/agent/revenue";
+import { EmptyState } from "@/components/empty-state";
+import { Inbox, CheckCircle2, FileUp } from "lucide-react";
 
 function currentMonth(): string {
   // Static default; user can edit. Avoids Date.now() determinism concerns in tests.
@@ -164,7 +166,11 @@ export default async function DashboardPage() {
 
               <TabsContent value="auto" className="mt-4 flex flex-col gap-3">
                 {groups.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No transactions yet.</p>
+                  <EmptyState
+                    icon={Inbox}
+                    title="No transactions yet"
+                    hint="Run a monthly close to see auto-categorized transactions here."
+                  />
                 ) : (
                   groups.map((g) => (
                     <CategoryGroup
@@ -182,9 +188,11 @@ export default async function DashboardPage() {
                   className="mt-4 flex flex-col gap-3"
                 >
                   {exceptions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No exceptions — everything categorized cleanly.
-                    </p>
+                    <EmptyState
+                      icon={CheckCircle2}
+                      title="No exceptions"
+                      hint="Everything categorized cleanly — nothing needs your review."
+                    />
                   ) : (
                     exceptions.map((tx) => <ExceptionRow key={tx.id} tx={tx} />)
                   )}
@@ -206,9 +214,11 @@ export default async function DashboardPage() {
       ) : (
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <p className="text-sm text-muted-foreground">
-              No runs yet. Upload source files above to start your first close.
-            </p>
+            <EmptyState
+              icon={FileUp}
+              title="No runs yet"
+              hint="Upload your source files above to start your first monthly close."
+            />
           </div>
           <div className="lg:col-span-1">
             <RevenueBySource data={[]} />

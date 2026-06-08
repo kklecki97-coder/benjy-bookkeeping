@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ActivityLog } from "@/components/activity-log";
 import { countsAsRevenue } from "@/lib/agent/revenue";
 
 const fmtMoney = (n: number) =>
@@ -21,16 +22,6 @@ const STATUS_LABELS: Record<string, string> = {
   auto_approved: "Auto-categorized (unconfirmed)",
   pending: "Needs review",
   skipped: "Skipped",
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  approved: "Approved",
-  approved_all_auto: "Approved all auto-categorized",
-  edited: "Edited category",
-  skipped: "Skipped transaction",
-  rule_created: "Created a rule",
-  posted: "Posted to QuickBooks",
-  post_failed: "Post failed",
 };
 
 export default async function RunDetailPage({
@@ -51,7 +42,7 @@ export default async function RunDetailPage({
 
   const { data: txs } = await supabase
     .from("transactions")
-    .select("source, amount, status, approved_category, suggested_category, qbo_post_error")
+    .select("id, source, amount, description, status, approved_category, suggested_category, qbo_post_error")
     .eq("monthly_run_id", runId);
 
   const all = txs ?? [];
@@ -75,13 +66,38 @@ export default async function RunDetailPage({
   }
   const failures = [...failByCat.entries()].sort((a, b) => b[1] - a[1]);
 
-  // audit trail
-  const { data: audit } = await supabase
+  // audit trail — join transaction detail in memory via the `all` rows we
+  // already loaded (no extra query), so each entry can show what it acted on.
+  const txById = new Map(
+    all.map((t) => [
+      t.id,
+      {
+        description: t.description ?? "",
+        amount: Number(t.amount),
+        source: t.source,
+      },
+    ]),
+  );
+
+  const { data: auditRaw } = await supabase
     .from("audit_log")
-    .select("action, after_state, created_at")
+    .select("action, transaction_id, before_state, after_state, created_at")
     .eq("monthly_run_id", runId)
     .order("created_at", { ascending: false })
     .limit(50);
+
+  const audit = (auditRaw ?? []).map((a) => {
+    const tx = a.transaction_id ? txById.get(a.transaction_id) : undefined;
+    return {
+      action: a.action,
+      before_state: a.before_state,
+      after_state: a.after_state,
+      created_at: a.created_at,
+      txDescription: tx?.description ?? null,
+      txAmount: tx?.amount ?? null,
+      txSource: tx?.source ?? null,
+    };
+  });
 
   const posted = byStatus.get("posted") ?? 0;
   const failed = byStatus.get("post_failed") ?? 0;
@@ -109,7 +125,7 @@ export default async function RunDetailPage({
       </header>
 
       {/* Top-line numbers */}
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           { label: "Transactions", value: String(all.length) },
           { label: "Posted to QBO", value: String(posted) },
@@ -123,29 +139,45 @@ export default async function RunDetailPage({
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
         {/* Breakdown by status */}
-        <Card>
+        <Card className="h-full">
           <CardHeader>
             <CardTitle className="text-base">Breakdown by status</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
-            {[...byStatus.entries()].sort().map(([status, n]) => (
-              <div
-                key={status}
-                className="flex items-center justify-between text-sm"
-              >
-                <span className="text-muted-foreground">
-                  {STATUS_LABELS[status] ?? status}
-                </span>
-                <span className="tabular-nums font-medium">{n}</span>
-              </div>
-            ))}
+            <p className="mb-1 text-xs text-muted-foreground">
+              Where the {all.length} transactions ended up:
+            </p>
+            {[...byStatus.entries()].sort().map(([status, n]) => {
+              const pct = all.length ? Math.round((n / all.length) * 100) : 0;
+              return (
+                <div key={status} className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {STATUS_LABELS[status] ?? status}
+                    </span>
+                    <span className="tabular-nums font-medium">
+                      {n}{" "}
+                      <span className="text-xs text-muted-foreground">
+                        ({pct}%)
+                      </span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-foreground/5">
+                    <div
+                      className="h-full rounded-full bg-primary/60"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 
         {/* Failed-to-post reasons */}
-        <Card>
+        <Card className="h-full">
           <CardHeader>
             <CardTitle className="text-base">
               Couldn&apos;t post ({failed})
@@ -166,10 +198,8 @@ export default async function RunDetailPage({
                     key={cat}
                     className="flex items-center justify-between text-sm"
                   >
-                    <span>{cat}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {n} tx
-                    </span>
+                    <span className="text-muted-foreground">{cat}</span>
+                    <span className="tabular-nums font-medium">{n} tx</span>
                   </div>
                 ))}
               </>
@@ -183,22 +213,8 @@ export default async function RunDetailPage({
         <CardHeader>
           <CardTitle className="text-base">Activity log</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-1.5">
-          {(audit ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No activity recorded.</p>
-          ) : (
-            (audit ?? []).map((a, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between border-b border-border py-1.5 text-sm last:border-0"
-              >
-                <span>{ACTION_LABELS[a.action] ?? a.action}</span>
-                <span className="text-xs text-muted-foreground">
-                  {String(a.created_at).slice(0, 16).replace("T", " ")}
-                </span>
-              </div>
-            ))
-          )}
+        <CardContent>
+          <ActivityLog entries={audit ?? []} />
         </CardContent>
       </Card>
     </>

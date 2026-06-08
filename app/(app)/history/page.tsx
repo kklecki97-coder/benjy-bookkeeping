@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, History as HistoryIcon } from "lucide-react";
 import { createSSRClient } from "@/lib/supabase/ssr";
+import { EmptyState } from "@/components/empty-state";
 import {
   Card,
   CardContent,
@@ -36,7 +37,11 @@ export default async function HistoryPage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {(runs ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No runs yet.</p>
+            <EmptyState
+              icon={HistoryIcon}
+              title="No runs yet"
+              hint="Your past monthly closes will appear here once you run one."
+            />
           ) : (
             (runs ?? []).map((run) => (
               <Link
