@@ -25,7 +25,21 @@ const fmt = (n: number) =>
 export function RevenueBySource({ data }: { data: SourceRevenue[] }) {
   const sorted = [...data].sort((a, b) => b.amount - a.amount);
   const total = sorted.reduce((s, d) => s + d.amount, 0);
-  if (total <= 0) return null;
+
+  if (total <= 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Revenue by source</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            No revenue yet. Run a monthly close to see a breakdown by channel.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

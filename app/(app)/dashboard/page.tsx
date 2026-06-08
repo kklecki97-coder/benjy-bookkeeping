@@ -127,13 +127,12 @@ export default async function DashboardPage() {
         </p>
       </header>
 
-      {/* Current-month summary up top once a run exists */}
-      {run && (
-        <div className="mb-8 flex flex-col gap-4">
-          <StatCards stats={stats} />
-          <PipelineStatus status={run.status} />
-        </div>
-      )}
+      {/* Summary is always visible — shows zeros before the first run so the
+          page structure stays stable instead of appearing only after upload. */}
+      <div className="mb-8 flex flex-col gap-4">
+        <StatCards stats={stats} />
+        {run && <PipelineStatus status={run.status} />}
+      </div>
 
       <div className="mb-8">
         <RunControls
@@ -205,10 +204,17 @@ export default async function DashboardPage() {
           />
         </section>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          No runs yet. Upload source files above to start your first close.
-          </p>
-        )}
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <p className="text-sm text-muted-foreground">
+              No runs yet. Upload source files above to start your first close.
+            </p>
+          </div>
+          <div className="lg:col-span-1">
+            <RevenueBySource data={[]} />
+          </div>
+        </section>
+      )}
     </>
   );
 }

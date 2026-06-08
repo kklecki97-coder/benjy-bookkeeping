@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { createSSRClient } from "@/lib/supabase/ssr";
 import {
   Card,
@@ -37,16 +39,18 @@ export default async function HistoryPage() {
             <p className="text-sm text-muted-foreground">No runs yet.</p>
           ) : (
             (runs ?? []).map((run) => (
-              <div
+              <Link
                 key={run.id}
-                className="flex items-center justify-between rounded-xl glass glass-hover p-3 text-sm"
+                href={`/history/${run.id}`}
+                className="flex cursor-pointer items-center gap-3 rounded-xl glass glass-hover p-3 text-sm transition-colors"
               >
                 <span className="font-medium">{run.month_year}</span>
                 <Badge variant="secondary">{run.status}</Badge>
-                <span className="text-xs text-muted-foreground">
+                <span className="ml-auto text-xs text-muted-foreground">
                   {run.started_at?.slice(0, 10)}
                 </span>
-              </div>
+                <ChevronRight className="size-4 text-muted-foreground" />
+              </Link>
             ))
           )}
         </CardContent>
