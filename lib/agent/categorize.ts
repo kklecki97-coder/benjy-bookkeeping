@@ -64,19 +64,22 @@ export async function categorize(
   // Batch to keep each response well under max_tokens. A single huge batch
   // overflows the output limit and returns truncated (invalid) JSON.
   const BATCH_SIZE = 40;
-  const results: Categorization[] = [];
 
+  // Split into batches, then run them concurrently. The batches are fully
+  // independent (no batch needs another's result), so awaiting them one by one
+  // wasted wall-clock time — total time was the SUM of all batches. With
+  // Promise.all the total is the slowest SINGLE batch instead. Results are
+  // collected in batch order so output stays deterministic.
+  const batches: TxWithId[][] = [];
   for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
-    const batch = transactions.slice(i, i + BATCH_SIZE);
-    const batchResults = await categorizeBatch(
-      client,
-      batch,
-      rulesContext,
-    );
-    results.push(...batchResults);
+    batches.push(transactions.slice(i, i + BATCH_SIZE));
   }
 
-  return results;
+  const batchResults = await Promise.all(
+    batches.map((batch) => categorizeBatch(client, batch, rulesContext)),
+  );
+
+  return batchResults.flat();
 }
 
 async function categorizeBatch(
