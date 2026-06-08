@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RulesTable, type Rule } from "@/components/rules-table";
 import { QboConnect } from "@/components/qbo-connect";
 import { DriveConnect } from "@/components/drive-connect";
+import { ShopifyConnect } from "@/components/shopify-connect";
 import { AccountCard } from "@/components/account-card";
 import { serviceAccountEmail } from "@/lib/drive/auth";
 
@@ -38,6 +39,12 @@ export default async function SettingsPage() {
     .maybeSingle();
   const driveServiceEmail = serviceAccountEmail();
 
+  const shopifyConnected =
+    !!process.env.SHOPIFY_STORE_DOMAIN &&
+    !!process.env.SHOPIFY_CLIENT_ID &&
+    !!process.env.SHOPIFY_CLIENT_SECRET;
+  const shopifyDomain = process.env.SHOPIFY_STORE_DOMAIN ?? null;
+
   return (
     <>
       <header className="mb-8">
@@ -56,15 +63,20 @@ export default async function SettingsPage() {
           <TabsTrigger value="account">Account</TabsTrigger>
         </TabsList>
 
+        {/* Sources first (where data comes from), then the destination (QBO). */}
         <TabsContent value="connections" className="mt-6 flex flex-col gap-3">
-          <QboConnect
-            connected={!!qbo}
-            environment={qbo?.environment ?? "sandbox"}
-          />
           <DriveConnect
             connected={!!drive?.folder_id}
             folderId={drive?.folder_id ?? null}
             serviceEmail={driveServiceEmail}
+          />
+          <ShopifyConnect
+            connected={shopifyConnected}
+            storeDomain={shopifyDomain}
+          />
+          <QboConnect
+            connected={!!qbo}
+            environment={qbo?.environment ?? "sandbox"}
           />
         </TabsContent>
 

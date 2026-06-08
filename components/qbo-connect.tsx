@@ -9,20 +9,19 @@ export function QboConnect({
   environment: string;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-xl glass p-4">
-      <div>
-        <p className="text-sm font-medium">QuickBooks Online</p>
-        <p className="text-xs text-muted-foreground">
-          {connected ? (
-            <>
-              Connected <Badge variant="secondary">{environment}</Badge>
-            </>
-          ) : (
-            "Not connected — posting is disabled until you connect."
-          )}
+    <div className="flex items-center justify-between gap-4 rounded-xl glass p-4">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">
+          QuickBooks Online{" "}
+          {connected && <Badge variant="secondary">{environment}</Badge>}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">
+          {connected
+            ? "Approved transactions post here each month."
+            : "Not connected — posting is disabled until you connect."}
         </p>
       </div>
-      <a href="/api/qbo/connect">
+      <a href="/api/qbo/connect" className="shrink-0">
         <Button variant={connected ? "outline" : "default"} size="sm">
           {connected ? "Reconnect" : "Connect QuickBooks"}
         </Button>
