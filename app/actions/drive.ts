@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSSRClient } from "@/lib/supabase/ssr";
-import { setFolderId } from "@/lib/drive/oauth";
+import { setFolderId, getFolderId } from "@/lib/drive/auth";
 import { runCloseFromDrive } from "@/lib/run/from-drive";
 
 export async function saveDriveFolder(folderId: string) {
@@ -30,7 +30,6 @@ export async function runFromDrive(monthYear: string) {
   if (!user) return { ok: false, message: "Not authenticated." };
 
   try {
-    const { getFolderId } = await import("@/lib/drive/oauth");
     const folderId = await getFolderId();
     if (!folderId) {
       return { ok: false, message: "No Drive folder configured. Set one in Settings." };

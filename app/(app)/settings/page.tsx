@@ -11,6 +11,7 @@ import { RulesTable, type Rule } from "@/components/rules-table";
 import { QboConnect } from "@/components/qbo-connect";
 import { DriveConnect } from "@/components/drive-connect";
 import { AccountCard } from "@/components/account-card";
+import { serviceAccountEmail } from "@/lib/drive/auth";
 
 export default async function SettingsPage() {
   const supabase = await createSSRClient();
@@ -35,6 +36,7 @@ export default async function SettingsPage() {
     .select("folder_id")
     .limit(1)
     .maybeSingle();
+  const driveServiceEmail = serviceAccountEmail();
 
   return (
     <>
@@ -59,7 +61,11 @@ export default async function SettingsPage() {
             connected={!!qbo}
             environment={qbo?.environment ?? "sandbox"}
           />
-          <DriveConnect connected={!!drive} folderId={drive?.folder_id ?? null} />
+          <DriveConnect
+            connected={!!drive?.folder_id}
+            folderId={drive?.folder_id ?? null}
+            serviceEmail={driveServiceEmail}
+          />
         </TabsContent>
 
         <TabsContent value="rules" className="mt-6">

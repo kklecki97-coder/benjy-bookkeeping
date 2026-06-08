@@ -1,6 +1,6 @@
 import "server-only";
 import type { DriveConnector, DriveFile } from "./types";
-import { getValidAccessToken, isConnected as connCheck } from "./oauth";
+import { getAccessToken, isConnected as connCheck } from "./auth";
 
 const API = "https://www.googleapis.com/drive/v3";
 
@@ -10,7 +10,7 @@ export const driveConnector: DriveConnector = {
   },
 
   async listFiles(folderId: string): Promise<DriveFile[]> {
-    const token = await getValidAccessToken();
+    const token = await getAccessToken();
     const q = encodeURIComponent(
       `'${folderId}' in parents and trashed = false`,
     );
@@ -24,7 +24,7 @@ export const driveConnector: DriveConnector = {
   },
 
   async downloadFile(fileId: string): Promise<Buffer> {
-    const token = await getValidAccessToken();
+    const token = await getAccessToken();
     const res = await fetch(`${API}/files/${fileId}?alt=media`, {
       headers: { Authorization: `Bearer ${token}` },
     });
