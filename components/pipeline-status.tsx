@@ -26,8 +26,11 @@ export function PipelineStatus({ status }: { status: string }) {
     <div className="glass flex items-center gap-2 rounded-xl p-4">
       {STEPS.map((step, i) => {
         const stepOrder = i + 1;
-        const done = current > stepOrder;
-        const active = current === stepOrder;
+        const isLast = i === STEPS.length - 1;
+        // A step is "done" once we've moved past it. The final step ("Posted")
+        // has nothing after it, so it counts as done the moment it's reached.
+        const done = current > stepOrder || (isLast && current >= stepOrder);
+        const active = current === stepOrder && !done;
         return (
           <div key={step.key} className="flex flex-1 items-center gap-2">
             <div className="flex items-center gap-2">

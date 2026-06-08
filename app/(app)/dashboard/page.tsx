@@ -5,7 +5,6 @@ import { CategoryGroup, type GroupTx } from "@/components/category-group";
 import { ExceptionRow, type ExceptionTx } from "@/components/exception-row";
 import { PostBar } from "@/components/post-bar";
 import { StatCards, type RunStats } from "@/components/stat-cards";
-import { PipelineStatus } from "@/components/pipeline-status";
 import {
   RevenueBySource,
   type SourceRevenue,
@@ -130,16 +129,18 @@ export default async function DashboardPage() {
       </header>
 
       {/* Summary is always visible — shows zeros before the first run so the
-          page structure stays stable instead of appearing only after upload. */}
+          page structure stays stable instead of appearing only after upload.
+          Live run progress is shown inside RunControls (the "Processing…" panel),
+          so we don't duplicate it with a separate pipeline strip here. */}
       <div className="mb-8 flex flex-col gap-4">
         <StatCards stats={stats} />
-        {run && <PipelineStatus status={run.status} />}
       </div>
 
       <div className="mb-8">
         <RunControls
           defaultMonth={currentMonth()}
           driveConnected={driveConnected}
+          hasRun={!!run}
         />
       </div>
 
