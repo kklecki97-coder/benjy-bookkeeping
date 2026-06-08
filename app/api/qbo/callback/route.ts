@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCode } from "@/lib/qbo/oauth";
+import { createSSRClient } from "@/lib/supabase/ssr";
 
 /** OAuth callback — Intuit redirects here with code + realmId. */
 export async function GET(request: NextRequest) {
@@ -10,6 +11,16 @@ export async function GET(request: NextRequest) {
   const cookieState = request.cookies.get("qbo_oauth_state")?.value;
 
   const dashboard = new URL("/settings", url.origin);
+
+  // Token exchange writes service-role data; require an authenticated session
+  // before doing it, so a callback can't be replayed without a logged-in user.
+  const supabase = await createSSRClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.redirect(new URL("/login", url.origin));
+  }
 
   if (!code || !realmId) {
     dashboard.searchParams.set("qbo", "error");

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCode } from "@/lib/drive/oauth";
+import { createSSRClient } from "@/lib/supabase/ssr";
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
@@ -8,6 +9,16 @@ export async function GET(request: NextRequest) {
   const cookieState = request.cookies.get("drive_oauth_state")?.value;
 
   const settings = new URL("/settings", url.origin);
+
+  // Token exchange writes service-role data; require an authenticated session
+  // before doing it, so a callback can't be replayed without a logged-in user.
+  const supabase = await createSSRClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.redirect(new URL("/login", url.origin));
+  }
 
   if (!code) {
     settings.searchParams.set("drive", "error");
