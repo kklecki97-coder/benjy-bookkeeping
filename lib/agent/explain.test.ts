@@ -71,3 +71,59 @@ describe("buildExplainPrompt", () => {
     expect(prompt.toLowerCase()).toContain("plain english");
   });
 });
+
+describe("buildExplainPrompt — guardrails", () => {
+  const lower = (over: Partial<ExplainTx> = {}) =>
+    buildExplainPrompt(tx(over), []).toLowerCase();
+
+  it("forbids promising actions it won't perform (no 'going forward' auto-rules)", () => {
+    const p = lower();
+    // it must instruct NOT to claim it will remember / set up a rule itself
+    expect(p).toContain("do not promise");
+    // and must point the owner to the real mechanism instead
+    expect(p).toContain('save as a rule');
+  });
+
+  it("forbids downplaying the need to review", () => {
+    expect(lower()).toContain("do not tell the owner they can skip");
+  });
+
+  it("requires a single first-person voice ('I', never 'we'/'the system')", () => {
+    expect(lower()).toContain('always write as "i"');
+  });
+
+  it("forbids inventing meaning from bank codes/abbreviations", () => {
+    expect(lower()).toContain("do not invent");
+  });
+
+  it("scales length to amount instead of always being long", () => {
+    const p = lower();
+    expect(p).toContain("1-2 sentences");
+  });
+
+  it("forbids guessing a category when the suggestion is Uncategorized", () => {
+    const p = buildExplainPrompt(
+      tx({ suggested_category: "Uncategorized", confidence: 40 }),
+      [],
+    ).toLowerCase();
+    // when there's no real basis, it must say so rather than guess a category
+    expect(p).toContain("do not guess a category");
+  });
+
+  it("forbids guessing a category when there is no suggestion at all", () => {
+    const p = buildExplainPrompt(
+      tx({ suggested_category: null, confidence: 30 }),
+      [],
+    ).toLowerCase();
+    expect(p).toContain("do not guess a category");
+  });
+
+  it("does NOT add the no-guess instruction when there is a real suggestion", () => {
+    // a confident-ish suggestion should still let Claude state its best guess
+    const p = buildExplainPrompt(
+      tx({ suggested_category: "Bank Fees", confidence: 75 }),
+      [],
+    ).toLowerCase();
+    expect(p).not.toContain("do not guess a category");
+  });
+});

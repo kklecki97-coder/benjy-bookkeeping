@@ -57,11 +57,51 @@ export function buildExplainPrompt(tx: ExplainTx, candidateRules: RuleForAgent[]
   }
   lines.push("");
 
+  // When there's no real suggestion (Uncategorized / null / very low
+  // confidence), the description gives no basis to pick a category — so the
+  // explanation must NOT fabricate one. This is the worst failure mode: lowest
+  // certainty paired with the most confident-sounding guess.
+  const hasRealSuggestion =
+    !!tx.suggested_category &&
+    tx.suggested_category.toLowerCase().trim() !== "uncategorized";
+
   lines.push(
-    "Explain to the business owner, in plain English (2-4 short sentences, conversational, no jargon, no bullet points), WHY this one was uncertain and what would resolve it. " +
-      "Be specific to THIS transaction. If you have a best guess at the right category, say so and why. " +
-      "If you genuinely can't tell, say what extra context (e.g. what was bought, which vendor) would settle it. " +
-      "Write as if talking to the owner directly — start with the explanation, not a preamble.",
+    "Explain to the business owner, in plain English, WHY this one was uncertain and what would resolve it.",
+  );
+  lines.push("");
+  lines.push("Rules for your explanation — follow ALL of them:");
+  lines.push(
+    '- Always write as "I" (you ARE the bookkeeping assistant). Never say "we", "the system", or "the agent" — one consistent first-person voice.',
+  );
+  lines.push(
+    "- Length scales with the stakes: 1-2 sentences for small or clear-cut charges; only go longer (still under 4 sentences) for large amounts or genuinely ambiguous ones. No filler, no \"honestly\", no \"pretty straightforward\".",
+  );
+  lines.push(
+    '- Do NOT promise to do anything yourself. You cannot create rules, remember choices, or auto-categorize "going forward" — you only explain. If a rule would help, say the owner can do it via Edit → tick "Save as a rule"; never imply you will do it.',
+  );
+  lines.push(
+    "- Do NOT tell the owner they can skip reviewing this or that it's safe to approve without looking. It was flagged for a reason; explain the reason, don't wave it away.",
+  );
+  lines.push(
+    "- Do NOT invent meaning from bank codes, abbreviations, or fragments in the description (e.g. don't claim \"AUTH PAYME\" signals a recurring payment). Only use what you can actually see; if a code is unclear, treat it as unknown.",
+  );
+  lines.push(
+    "- Use only the details given above — never invent amounts, dates, vendors, or QuickBooks account names.",
+  );
+
+  if (hasRealSuggestion) {
+    lines.push(
+      "- You have a tentative suggestion above. State it as your best guess and briefly why, but stay honest about the uncertainty. If a specific detail from the owner would confirm it, ask for that one thing.",
+    );
+  } else {
+    lines.push(
+      "- There is NO usable suggestion here and the description gives almost nothing to go on. Do NOT guess a category or offer a \"best guess\" — that would be inventing one. Instead, say plainly that you can't tell what this is from the description alone, and ask the owner for the specific missing context (e.g. what the check or charge was for) needed to categorize it.",
+    );
+  }
+
+  lines.push("");
+  lines.push(
+    "Write as if talking to the owner directly — start with the explanation, not a preamble. No bullet points in your answer; just plain sentences.",
   );
 
   return lines.join("\n");
