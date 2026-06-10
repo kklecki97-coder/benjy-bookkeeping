@@ -40,14 +40,17 @@ export function PostBar({
   const [posting, setPosting] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [checking, setChecking] = useState(false);
-  const [pending, startTransition] = useTransition();
+  // One transition per action so clicking (e.g.) Post never relabels the
+  // separate "Approve all auto" button to "Approving…" and vice versa.
+  const [approving, startApprove] = useTransition();
+  const [postPending, startPost] = useTransition();
 
   // Open the dialog and run the read-only pre-post account check.
   function openAndCheck() {
     setOpen(true);
     setPreview(null);
     setChecking(true);
-    startTransition(async () => {
+    startPost(async () => {
       const r = await previewPost(runId);
       setChecking(false);
       if (r.ok) setPreview(r.preview);
@@ -58,7 +61,7 @@ export function PostBar({
   function confirmPost() {
     setOpen(false);
     setPosting(true);
-    startTransition(async () => {
+    startPost(async () => {
       const result = await postToQbo(runId);
       setMessage(result.message);
       setPosting(false);
@@ -82,18 +85,18 @@ export function PostBar({
           <Button
             variant="outline"
             size="sm"
-            disabled={pending}
+            disabled={approving}
             onClick={() =>
-              startTransition(async () => {
+              startApprove(async () => {
                 const r = await approveAllAuto(runId);
                 setMessage(r.message);
               })
             }
           >
-            {pending ? "Approving…" : `Approve all auto (${autoCount})`}
+            {approving ? "Approving…" : `Approve all auto (${autoCount})`}
           </Button>
         )}
-        <Button disabled={readyCount === 0 || pending} onClick={openAndCheck}>
+        <Button disabled={readyCount === 0 || postPending} onClick={openAndCheck}>
           Post {readyCount} to QuickBooks
         </Button>
 
@@ -157,7 +160,7 @@ export function PostBar({
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button disabled={pending || checking} onClick={confirmPost}>
+              <Button disabled={postPending || checking} onClick={confirmPost}>
                 {preview && preview.missing.length > 0
                   ? `Post the ${preview.matchedCount} anyway`
                   : "Confirm & Post"}

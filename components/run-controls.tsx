@@ -32,7 +32,12 @@ export function RunControls({
   // When a run already exists, start collapsed (review is the focus). The owner
   // expands this only when starting a new month's close.
   const [open, setOpen] = useState(!hasRun);
-  const [pending, startTransition] = useTransition();
+  // One transition per run source so clicking "Run from Drive" doesn't relabel
+  // the "Run from uploaded files" button to "Processing…" (and vice versa).
+  const [pendingUpload, startUpload] = useTransition();
+  const [pendingDrive, startDrive] = useTransition();
+  // A run is happening either way — used for the collapse guard / progress.
+  const pending = pendingUpload || pendingDrive;
 
   // Guard against malformed months like "2026-13" or "April" before running.
   const monthValid = /^\d{4}-(0[1-9]|1[0-2])$/.test(month.trim());
@@ -52,7 +57,7 @@ export function RunControls({
     if (files) {
       for (const f of Array.from(files)) formData.append("files", f);
     }
-    startTransition(async () => {
+    startUpload(async () => {
       setMessage(null);
       const result = await runClose(month, formData);
       setMessage(result.message);
@@ -64,7 +69,7 @@ export function RunControls({
       setMessage("Enter the month as YYYY-MM (e.g. 2026-04).");
       return;
     }
-    startTransition(async () => {
+    startDrive(async () => {
       setMessage("Pulling from Google Drive…");
       const result = await runFromDrive(month);
       setMessage(result.message);
@@ -141,7 +146,7 @@ export function RunControls({
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button onClick={onRun} disabled={pending} className="flex-1">
-            {pending ? "Processing…" : "Run from uploaded files"}
+            {pendingUpload ? "Processing…" : "Run from uploaded files"}
           </Button>
           {driveConnected && (
             <Button
@@ -150,7 +155,7 @@ export function RunControls({
               variant="outline"
               className="flex-1"
             >
-              {pending ? "Processing…" : "Run from Google Drive"}
+              {pendingDrive ? "Processing…" : "Run from Google Drive"}
             </Button>
           )}
         </div>

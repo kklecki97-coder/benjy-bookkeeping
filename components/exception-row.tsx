@@ -39,7 +39,12 @@ export function ExceptionRow({
   const [vendor, setVendor] = useState(tx.suggested_vendor ?? "");
   const [note, setNote] = useState("");
   const [saveAsRule, setSaveAsRule] = useState(true);
-  const [pending, startTransition] = useTransition();
+  // Accept and Skip render side by side — separate transitions so clicking one
+  // doesn't disable the other. Save & approve lives in the (mutually exclusive)
+  // editing view, so it gets its own too.
+  const [editPending, startEdit] = useTransition();
+  const [acceptPending, startAccept] = useTransition();
+  const [skipPending, startSkip] = useTransition();
 
   // on-demand "Why was this uncertain?" explanation (lazy — fetched once)
   const [why, setWhy] = useState<string | null>(null);
@@ -144,9 +149,9 @@ export function ExceptionRow({
           <div className="flex gap-2">
             <Button
               size="sm"
-              disabled={pending || !category}
+              disabled={editPending || !category}
               onClick={() =>
-                startTransition(async () => {
+                startEdit(async () => {
                   await editTransaction(
                     tx.id,
                     category,
@@ -158,7 +163,7 @@ export function ExceptionRow({
                 })
               }
             >
-              Save & approve
+              {editPending ? "Saving…" : "Save & approve"}
             </Button>
             <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
               Cancel
@@ -169,14 +174,14 @@ export function ExceptionRow({
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
             size="sm"
-            disabled={pending}
+            disabled={acceptPending}
             onClick={() =>
-              startTransition(async () => {
+              startAccept(async () => {
                 await acceptSuggestion(tx.id);
               })
             }
           >
-            Accept suggestion
+            {acceptPending ? "Accepting…" : "Accept suggestion"}
           </Button>
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
             Edit
@@ -193,14 +198,14 @@ export function ExceptionRow({
           <Button
             size="sm"
             variant="ghost"
-            disabled={pending}
+            disabled={skipPending}
             onClick={() =>
-              startTransition(async () => {
+              startSkip(async () => {
                 await skipTransaction(tx.id);
               })
             }
           >
-            Skip
+            {skipPending ? "Skipping…" : "Skip"}
           </Button>
         </div>
       )}

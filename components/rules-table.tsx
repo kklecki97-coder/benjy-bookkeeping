@@ -22,7 +22,12 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [pending, startTransition] = useTransition();
+  // Form save (create/update) gets its own transition; deletes are tracked per
+  // row via deletingId so deleting one rule doesn't grey out the others' Delete
+  // buttons.
+  const [savePending, startSave] = useTransition();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [, startDelete] = useTransition();
 
   // Show everything while editing/adding (the edited rule may be past the fold);
   // otherwise collapse to the first COLLAPSED_COUNT.
@@ -45,12 +50,12 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
         <RuleForm
           onCancel={() => setAdding(false)}
           onSave={(input) =>
-            startTransition(async () => {
+            startSave(async () => {
               await createRule(input);
               setAdding(false);
             })
           }
-          pending={pending}
+          pending={savePending}
         />
       )}
 
@@ -62,12 +67,12 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
               initial={rule}
               onCancel={() => setEditingId(null)}
               onSave={(input) =>
-                startTransition(async () => {
+                startSave(async () => {
                   await updateRule(rule.id, input);
                   setEditingId(null);
                 })
               }
-              pending={pending}
+              pending={savePending}
             />
           ) : (
             <div
@@ -98,14 +103,16 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={pending}
-                  onClick={() =>
-                    startTransition(async () => {
+                  disabled={deletingId === rule.id}
+                  onClick={() => {
+                    setDeletingId(rule.id);
+                    startDelete(async () => {
                       await deleteRule(rule.id);
-                    })
-                  }
+                      setDeletingId(null);
+                    });
+                  }}
                 >
-                  Delete
+                  {deletingId === rule.id ? "Deleting…" : "Delete"}
                 </Button>
               </div>
             </div>
