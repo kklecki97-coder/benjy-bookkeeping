@@ -5,6 +5,7 @@ import { CategoryGroup, type GroupTx } from "@/components/category-group";
 import { type ExceptionTx } from "@/components/exception-row";
 import { ExceptionGroup } from "@/components/exception-group";
 import { SkippedRow } from "@/components/skipped-row";
+import { ResetRun } from "@/components/reset-run";
 import { PostBar } from "@/components/post-bar";
 import { StatCards, type RunStats } from "@/components/stat-cards";
 import {
@@ -66,6 +67,7 @@ export default async function DashboardPage() {
   let exceptionGroups: { category: string; txs: ExceptionTx[] }[] = [];
   let skipped: { id: string; source: string; description: string; amount: number }[] = [];
   let failedCount = 0;
+  let postedCount = 0;
   let stats: RunStats = { total: 0, autoCategorized: 0, needReview: 0, revenue: 0 };
   let revenueBySource: SourceRevenue[] = [];
 
@@ -84,6 +86,8 @@ export default async function DashboardPage() {
     const exc = all.filter((t) => t.status === "pending");
     const skippedTxs = all.filter((t) => t.status === "skipped");
     const failedTxs = all.filter((t) => t.status === "post_failed");
+    // anything already in QuickBooks → reset must be blocked
+    postedCount = all.filter((t) => t.status === "posted").length;
 
     // Revenue = sales from each channel's own source file (not bank-deposit
     // mirrors, not overlapping Hana summary lines). See countsAsRevenue.
@@ -235,19 +239,26 @@ export default async function DashboardPage() {
           <RevenueBySource data={revenueBySource} horizontal />
 
           <div>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between gap-4">
               <h2 className="font-heading text-lg font-medium">
                 Review — {run.month_year}
               </h2>
-              <p className="text-sm text-muted-foreground">
-                {autoCount} auto · {exceptions.length} to review
-                {skipped.length > 0 && ` · ${skipped.length} skipped`}
-                {failedCount > 0 && (
-                  <span className="text-destructive">
-                    {" "}· {failedCount} failed to post
-                  </span>
-                )}
-              </p>
+              <div className="flex items-center gap-4">
+                <p className="text-sm text-muted-foreground">
+                  {autoCount} auto · {exceptions.length} to review
+                  {skipped.length > 0 && ` · ${skipped.length} skipped`}
+                  {failedCount > 0 && (
+                    <span className="text-destructive">
+                      {" "}· {failedCount} failed to post
+                    </span>
+                  )}
+                </p>
+                <ResetRun
+                  runId={run.id}
+                  monthYear={run.month_year}
+                  postedCount={postedCount}
+                />
+              </div>
             </div>
 
             <Tabs defaultValue="auto">
