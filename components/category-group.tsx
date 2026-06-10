@@ -30,6 +30,10 @@ export function CategoryGroup({ runId, category, transactions }: CategoryGroupPr
 
   const total = transactions.reduce((s, t) => s + t.amount, 0);
   const allApproved = transactions.every((t) => t.status === "manually_approved");
+  // count low-confidence items so the owner doesn't bulk-approve weak guesses blind
+  const lowConf = transactions.filter(
+    (t) => t.confidence != null && t.confidence < 70,
+  ).length;
 
   return (
     <div className="rounded-xl glass glass-hover">
@@ -42,17 +46,33 @@ export function CategoryGroup({ runId, category, transactions }: CategoryGroupPr
           <span className="font-medium">{category}</span>
           <Badge variant="secondary">{transactions.length}</Badge>
           {allApproved && <Badge>approved</Badge>}
+          {!allApproved && lowConf > 0 && (
+            <span
+              className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs text-warning"
+              title={`${lowConf} transaction(s) below 70% confidence — worth a look before approving`}
+            >
+              {lowConf} to check
+            </span>
+          )}
         </button>
         <span className="text-sm tabular-nums text-muted-foreground">{fmt(total)}</span>
         <Button
           size="sm"
           variant={allApproved ? "outline" : "default"}
           disabled={pending || allApproved}
-          onClick={() =>
+          onClick={() => {
+            if (
+              lowConf > 0 &&
+              !window.confirm(
+                `${lowConf} transaction(s) in "${category}" are below 70% confidence. Approve the whole group anyway?`,
+              )
+            ) {
+              return;
+            }
             startTransition(async () => {
               await approveCategory(runId, category);
-            })
-          }
+            });
+          }}
         >
           {allApproved ? "Approved" : pending ? "Approving…" : "Approve group"}
         </Button>

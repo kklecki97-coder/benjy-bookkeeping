@@ -151,7 +151,7 @@ export async function postToQbo(
       .from("monthly_runs")
       .update({
         // "error" only if nothing posted at all; partial success is "complete"
-        // (failures sit in the retry queue, not a hard failure).
+        // (post_failed transactions remain eligible to retry on the next Post).
         status: result.posted === 0 && result.failed > 0 ? "error" : "complete",
         completed_at: new Date().toISOString(),
       })
@@ -170,7 +170,7 @@ export async function postToQbo(
     revalidatePath("/dashboard");
     return {
       ok: result.failed === 0,
-      message: `Posted ${result.posted} transactions to QuickBooks.${result.failed > 0 ? ` ${result.failed} failed — see retry queue.` : ""}`,
+      message: `Posted ${result.posted} transactions to QuickBooks.${result.failed > 0 ? ` ${result.failed} couldn't post (usually a missing QuickBooks account) — fix the account and post again; only the failed ones will retry.` : ""}`,
     };
   } catch (e) {
     return {

@@ -34,7 +34,14 @@ export function RunControls({
   const [open, setOpen] = useState(!hasRun);
   const [pending, startTransition] = useTransition();
 
+  // Guard against malformed months like "2026-13" or "April" before running.
+  const monthValid = /^\d{4}-(0[1-9]|1[0-2])$/.test(month.trim());
+
   function onRun() {
+    if (!monthValid) {
+      setMessage("Enter the month as YYYY-MM (e.g. 2026-04).");
+      return;
+    }
     // Files are optional when Shopify is connected — the run will still pull
     // Shopify (API) for the month. Only require files otherwise.
     if ((!files || files.length === 0) && !shopifyConnected) {
@@ -53,6 +60,10 @@ export function RunControls({
   }
 
   function onRunFromDrive() {
+    if (!monthValid) {
+      setMessage("Enter the month as YYYY-MM (e.g. 2026-04).");
+      return;
+    }
     startTransition(async () => {
       setMessage("Pulling from Google Drive…");
       const result = await runFromDrive(month);
@@ -103,8 +114,21 @@ export function RunControls({
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm text-muted-foreground">Month (YYYY-MM)</label>
-          <Input value={month} onChange={(e) => setMonth(e.target.value)} />
+          <label htmlFor="run-month" className="text-sm text-muted-foreground">
+            Month (YYYY-MM)
+          </label>
+          <Input
+            id="run-month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            placeholder="2026-04"
+            className={!monthValid && month.length > 0 ? "border-destructive" : ""}
+          />
+          {!monthValid && month.length > 0 && (
+            <span className="text-xs text-destructive">
+              Use the format YYYY-MM (e.g. 2026-04).
+            </span>
+          )}
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm text-muted-foreground">Source files</label>

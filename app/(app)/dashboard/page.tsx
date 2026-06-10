@@ -12,6 +12,7 @@ import {
 } from "@/components/revenue-by-source";
 import { countsAsRevenue } from "@/lib/agent/revenue";
 import { getKnownCategories } from "@/lib/categories";
+import { isConnected as qboConnected, qboEnv } from "@/lib/qbo/oauth";
 import { EmptyState } from "@/components/empty-state";
 import { Inbox, CheckCircle2, FileUp } from "lucide-react";
 
@@ -32,6 +33,11 @@ export default async function DashboardPage() {
 
   // categories the owner can pick from when editing an exception
   const categories = await getKnownCategories();
+
+  // surface QBO connection status up front (so a disconnected QBO is caught
+  // before review, not at the final Post click)
+  const qboIsConnected = await qboConnected();
+  const qboEnvironment = qboEnv();
 
   // most recent run
   const { data: run } = await supabase
@@ -136,13 +142,32 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <header className="mb-8">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
-          Monthly Close
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Upload sources, review, and post to QuickBooks.
-        </p>
+      <header className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight">
+            Monthly Close
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Upload sources, review, and post to QuickBooks.
+          </p>
+        </div>
+        <div
+          className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
+            qboIsConnected
+              ? "border-primary/30 bg-primary/5 text-primary"
+              : "border-destructive/30 bg-destructive/5 text-destructive"
+          }`}
+          title={
+            qboIsConnected
+              ? `QuickBooks connected (${qboEnvironment})`
+              : "QuickBooks not connected — posting is disabled"
+          }
+        >
+          <span
+            className={`size-1.5 rounded-full ${qboIsConnected ? "bg-primary" : "bg-destructive"}`}
+          />
+          QuickBooks {qboIsConnected ? qboEnvironment : "disconnected"}
+        </div>
       </header>
 
       {/* Summary is always visible — shows zeros before the first run so the

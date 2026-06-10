@@ -49,7 +49,15 @@ export function RevenueBySource({ data }: { data: SourceRevenue[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Revenue by source</CardTitle>
+        <CardTitle className="flex items-center gap-1.5 text-base">
+          Revenue by source
+          <span
+            className="flex size-4 cursor-help items-center justify-center rounded-full bg-muted/50 text-[10px] text-muted-foreground"
+            title="Counts sales from each channel's own report (Hana, HoneyBook, Shopify). Bank deposits of that same money are excluded so revenue isn't double-counted."
+          >
+            i
+          </span>
+        </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {sorted.map((d) => {
