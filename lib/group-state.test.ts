@@ -46,6 +46,34 @@ describe("groupApprovalState", () => {
     expect(g.fullyApproved).toBe(false); // length === 0 guard
     expect(g.showApprovedBadge).toBe(false);
     expect(g.buttonDisabled).toBe(true); // nothing to approve
+    expect(g.canDisapprove).toBe(false);
+  });
+
+  it("canDisapprove is true when there is an un-posted approved row to undo", () => {
+    const g = groupApprovalState(s("manually_approved", "auto_approved"));
+    expect(g.canDisapprove).toBe(true);
+  });
+
+  it("canDisapprove is false when nothing is approved yet", () => {
+    const g = groupApprovalState(s("auto_approved", "auto_approved"));
+    expect(g.canDisapprove).toBe(false);
+  });
+
+  it("canDisapprove is false when the only approved rows are already posted", () => {
+    // posted rows are in QuickBooks — disapprove must not offer to touch them
+    const g = groupApprovalState([
+      { status: "posted" },
+      { status: "posted" },
+    ]);
+    expect(g.canDisapprove).toBe(false);
+  });
+
+  it("canDisapprove ignores posted rows but stays true for un-posted approved ones", () => {
+    const g = groupApprovalState([
+      { status: "posted" },
+      { status: "manually_approved" },
+    ]);
+    expect(g.canDisapprove).toBe(true);
   });
 
   it("pending rows also count as unconfirmed (defensive — auto tab is auto/manual, but be safe)", () => {

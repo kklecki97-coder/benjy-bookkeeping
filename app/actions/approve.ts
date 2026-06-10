@@ -81,6 +81,41 @@ export async function approveCategory(runId: string, category: string) {
   return { ok: true, message: `Approved ${ids.length} in ${category}.` };
 }
 
+/** Undo approval for a category: manually_approved → auto_approved (back to
+ * "to confirm"). Only touches rows that are STILL manually_approved — posted
+ * rows have status "posted", so this can never try to pull something back out
+ * of QuickBooks. Clears approved_category/approved_at so it's a clean undo. */
+export async function disapproveCategory(runId: string, category: string) {
+  const { supabase, user } = await requireUser();
+  if (!user) return { ok: false, message: "Not authenticated." };
+
+  const { data: updated } = await supabase
+    .from("transactions")
+    .update({
+      status: "auto_approved",
+      approved_category: null,
+      approved_at: null,
+    })
+    .eq("monthly_run_id", runId)
+    .eq("suggested_category", category)
+    .eq("status", "manually_approved")
+    .select("id");
+
+  const ids = (updated ?? []).map((t) => t.id);
+  if (ids.length > 0) {
+    await supabase.from("audit_log").insert(
+      ids.map((id) => ({
+        monthly_run_id: runId,
+        transaction_id: id,
+        action: "disapproved",
+        user_id: user.id,
+      })),
+    );
+  }
+  revalidatePath("/dashboard");
+  return { ok: true, message: `Disapproved ${ids.length} in ${category}.` };
+}
+
 /** Skip every pending transaction with this suggested category (bulk remove).
  * One bulk UPDATE + one bulk audit INSERT — not a per-row loop, which made
  * large groups crawl through dozens of sequential round-trips. */

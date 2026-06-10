@@ -26,6 +26,9 @@ export interface GroupApprovalState {
   buttonLabel: string;
   buttonDisabled: boolean;
   showApprovedBadge: boolean;
+  /** there's an approved-but-not-yet-posted row whose approval can be undone.
+   * Posted rows are excluded — undoing approval can't pull them back out of QBO. */
+  canDisapprove: boolean;
 }
 
 const LOW_CONFIDENCE = 70;
@@ -37,6 +40,7 @@ export function groupApprovalState(rows: GroupRow[]): GroupApprovalState {
   const lowConfUnconfirmed = unconfirmedRows.filter(
     (t) => t.confidence != null && t.confidence < LOW_CONFIDENCE,
   ).length;
+  const canDisapprove = rows.some((t) => t.status === "manually_approved");
 
   return {
     unconfirmed,
@@ -45,5 +49,6 @@ export function groupApprovalState(rows: GroupRow[]): GroupApprovalState {
     buttonLabel: unconfirmed > 0 ? "Approve group" : "Approved",
     buttonDisabled: unconfirmed === 0,
     showApprovedBadge: fullyApproved,
+    canDisapprove,
   };
 }

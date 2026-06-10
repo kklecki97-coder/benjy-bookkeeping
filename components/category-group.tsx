@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { X, FolderInput } from "lucide-react";
 import {
   approveCategory,
+  disapproveCategory,
   skipTransaction,
   recategorizeTransaction,
 } from "@/app/actions/approve";
@@ -52,6 +53,7 @@ export function CategoryGroup({
   // used to flip the top button because both shared one pending flag.
   const [groupPending, startGroupTransition] = useTransition();
   const [rowPending, startRowTransition] = useTransition();
+  const [disapprovePending, startDisapprove] = useTransition();
   const [approveConfirm, setApproveConfirm] = useState(false);
 
   const doApprove = () =>
@@ -63,8 +65,14 @@ export function CategoryGroup({
   // Derive header state from work REMAINING, not every()-over-a-shrinking-set,
   // so removing a row never silently flips the group to "Approved". See
   // lib/group-state.ts for why.
-  const { fullyApproved, lowConfUnconfirmed, buttonLabel, buttonDisabled, showApprovedBadge } =
-    groupApprovalState(transactions);
+  const {
+    fullyApproved,
+    lowConfUnconfirmed,
+    buttonLabel,
+    buttonDisabled,
+    showApprovedBadge,
+    canDisapprove,
+  } = groupApprovalState(transactions);
 
   return (
     <div className="rounded-xl glass glass-hover">
@@ -95,6 +103,22 @@ export function CategoryGroup({
           )}
         </button>
         <span className="text-sm tabular-nums text-muted-foreground">{fmt(total)}</span>
+        {canDisapprove && (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={disapprovePending}
+            title="Undo approval — sends these back to 'to confirm' (only before posting)."
+            onClick={() =>
+              startDisapprove(async () => {
+                await disapproveCategory(runId, category);
+              })
+            }
+            className="text-muted-foreground hover:text-foreground"
+          >
+            {disapprovePending ? "Undoing…" : "Disapprove"}
+          </Button>
+        )}
         <Button
           size="sm"
           variant={fullyApproved ? "outline" : "default"}
