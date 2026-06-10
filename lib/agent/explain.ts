@@ -80,10 +80,13 @@ export function buildExplainPrompt(tx: ExplainTx, candidateRules: RuleForAgent[]
     '- Always write as "I" (you ARE the bookkeeping assistant). Never say "we", "the system", or "the agent" — one consistent first-person voice.',
   );
   lines.push(
-    "- Length scales with the stakes: 1-2 sentences for small or clear-cut charges; only go longer (still under 4 sentences) for large amounts or genuinely ambiguous ones. No filler, no \"honestly\", no \"pretty straightforward\".",
+    "- Be brief. For small or clear-cut charges, use AT MOST TWO sentences — this is a hard limit, not a suggestion. Only go to three when the amount is large or the category is genuinely ambiguous, and never exceed four. No filler, no \"honestly\", no \"pretty straightforward\", no asking about account-structure preferences on a tiny charge.",
   );
   lines.push(
-    '- Do NOT promise to do anything yourself. You cannot create rules, remember choices, or auto-categorize "going forward" — you only explain. If a rule would help, say the owner can do it via Edit → tick "Save as a rule"; never imply you will do it.',
+    '- Do NOT promise to do anything yourself. You cannot create rules, remember choices, or auto-categorize "going forward" — you only explain. If (and only if) the merchant or pattern is one that will recur, you may note the owner can save a rule via Edit → tick "Save as a rule"; never imply you will do it.',
+  );
+  lines.push(
+    "- Do NOT suggest saving a rule when the only distinguishing text is a UNIQUE IDENTIFIER that never repeats — a check number, a confirmation number, or a one-off transaction ID. A rule on those would never match again, so suggesting one is wrong; just ask what it was for.",
   );
   lines.push(
     "- Do NOT tell the owner they can skip reviewing this or that it's safe to approve without looking. It was flagged for a reason; explain the reason, don't wave it away.",

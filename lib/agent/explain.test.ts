@@ -98,7 +98,7 @@ describe("buildExplainPrompt — guardrails", () => {
 
   it("scales length to amount instead of always being long", () => {
     const p = lower();
-    expect(p).toContain("1-2 sentences");
+    expect(p).toContain("be brief");
   });
 
   it("forbids guessing a category when the suggestion is Uncategorized", () => {
@@ -141,5 +141,16 @@ describe("buildExplainPrompt — guardrails", () => {
       [],
     ).toLowerCase();
     expect(p).not.toContain("worth confirming before approving");
+  });
+
+  it("enforces a hard two-sentence cap for small, clear-cut charges", () => {
+    // Haiku tends to ramble; the prompt must set a hard ceiling, not a soft hint
+    const p = buildExplainPrompt(tx({ amount: -1 }), []).toLowerCase();
+    expect(p).toContain("at most two sentences");
+  });
+
+  it("forbids suggesting a rule for unique identifiers (check #, confirmation #)", () => {
+    const p = buildExplainPrompt(tx(), []).toLowerCase();
+    expect(p).toContain("unique identifier");
   });
 });
