@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RunControls } from "@/components/run-controls";
 import { CategoryGroup, type GroupTx } from "@/components/category-group";
 import { ExceptionRow, type ExceptionTx } from "@/components/exception-row";
+import { SkippedRow } from "@/components/skipped-row";
 import { PostBar } from "@/components/post-bar";
 import { StatCards, type RunStats } from "@/components/stat-cards";
 import {
@@ -42,6 +43,8 @@ export default async function DashboardPage() {
 
   let groups: { category: string; txs: GroupTx[] }[] = [];
   let exceptions: ExceptionTx[] = [];
+  let skipped: { id: string; source: string; description: string; amount: number }[] = [];
+  let failedCount = 0;
   let stats: RunStats = { total: 0, autoCategorized: 0, needReview: 0, revenue: 0 };
   let revenueBySource: SourceRevenue[] = [];
 
@@ -58,6 +61,8 @@ export default async function DashboardPage() {
       (t) => t.status === "auto_approved" || t.status === "manually_approved",
     );
     const exc = all.filter((t) => t.status === "pending");
+    const skippedTxs = all.filter((t) => t.status === "skipped");
+    const failedTxs = all.filter((t) => t.status === "post_failed");
 
     // Revenue = sales from each channel's own source file (not bank-deposit
     // mirrors, not overlapping Hana summary lines). See countsAsRevenue.
@@ -108,6 +113,14 @@ export default async function DashboardPage() {
       confidence: t.confidence,
       reasoning: t.reasoning,
     }));
+
+    skipped = skippedTxs.map((t) => ({
+      id: t.id,
+      source: t.source,
+      description: t.description ?? "",
+      amount: Number(t.amount),
+    }));
+    failedCount = failedTxs.length;
   }
 
   const autoCount = groups.reduce((s, g) => s + g.txs.length, 0);
@@ -163,6 +176,12 @@ export default async function DashboardPage() {
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   {autoCount} auto · {exceptions.length} to review
+                  {skipped.length > 0 && ` · ${skipped.length} skipped`}
+                  {failedCount > 0 && (
+                    <span className="text-destructive">
+                      {" "}· {failedCount} failed to post
+                    </span>
+                  )}
                 </p>
               </div>
 
@@ -172,6 +191,11 @@ export default async function DashboardPage() {
                 <TabsTrigger value="exceptions">
                   Exceptions ({exceptions.length})
                 </TabsTrigger>
+                {skipped.length > 0 && (
+                  <TabsTrigger value="skipped">
+                    Skipped ({skipped.length})
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="auto" className="mt-4 flex flex-col gap-3">
@@ -209,6 +233,21 @@ export default async function DashboardPage() {
                     ))
                   )}
                 </TabsContent>
+
+                {skipped.length > 0 && (
+                  <TabsContent
+                    value="skipped"
+                    className="mt-4 flex flex-col gap-2"
+                  >
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      These won&apos;t be posted to QuickBooks. Restore any to put
+                      it back into review.
+                    </p>
+                    {skipped.map((tx) => (
+                      <SkippedRow key={tx.id} tx={tx} />
+                    ))}
+                  </TabsContent>
+                )}
               </Tabs>
             </div>
 

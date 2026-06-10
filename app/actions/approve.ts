@@ -217,3 +217,25 @@ export async function skipTransaction(txId: string) {
   revalidatePath("/dashboard");
   return { ok: true, message: "Skipped." };
 }
+
+/** Restore a skipped transaction back into review (pending). */
+export async function unskipTransaction(txId: string) {
+  const { supabase, user } = await requireUser();
+  if (!user) return { ok: false, message: "Not authenticated." };
+
+  const { data: tx } = await supabase
+    .from("transactions")
+    .select("monthly_run_id")
+    .eq("id", txId)
+    .single();
+
+  await supabase.from("transactions").update({ status: "pending" }).eq("id", txId);
+  await supabase.from("audit_log").insert({
+    monthly_run_id: tx?.monthly_run_id ?? null,
+    transaction_id: txId,
+    action: "unskipped",
+    user_id: user.id,
+  });
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Restored." };
+}
