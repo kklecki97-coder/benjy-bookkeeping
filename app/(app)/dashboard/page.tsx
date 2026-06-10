@@ -106,9 +106,35 @@ export default async function DashboardPage() {
     for (const t of revenueTxs) {
       revMap.set(t.source, (revMap.get(t.source) ?? 0) + Math.abs(Number(t.amount)));
     }
+
+    // previous month's per-source revenue, for the ▲/▼ vs-last-month chips.
+    // Same prev-run lookup the narrative uses; null when there's no prior run.
+    const prevMap = new Map<string, number>();
+    const { data: prevRun } = await supabase
+      .from("monthly_runs")
+      .select("id")
+      .lt("month_year", run.month_year)
+      .neq("id", run.id)
+      .order("month_year", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prevRun) {
+      const { data: prevTxs } = await supabase
+        .from("transactions")
+        .select("source, amount, suggested_category, status, description")
+        .eq("monthly_run_id", prevRun.id);
+      for (const t of (prevTxs ?? []).filter(countsAsRevenue)) {
+        prevMap.set(
+          t.source,
+          (prevMap.get(t.source) ?? 0) + Math.abs(Number(t.amount)),
+        );
+      }
+    }
+
     revenueBySource = [...revMap.entries()].map(([source, amount]) => ({
       source,
       amount,
+      previousAmount: prevRun ? (prevMap.get(source) ?? 0) : null,
     }));
 
     const byCategory = new Map<string, GroupTx[]>();

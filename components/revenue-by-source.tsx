@@ -1,4 +1,4 @@
-import { BarChart3 } from "lucide-react";
+import { BarChart3, TrendingUp, TrendingDown, Minus, Sparkle } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -6,10 +6,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
+import { revenueDelta } from "@/lib/revenue-delta";
 
 export interface SourceRevenue {
   source: string;
   amount: number;
+  /** same channel's revenue last month, if there was a prior run */
+  previousAmount?: number | null;
 }
 
 const LABELS: Record<string, string> = {
@@ -23,6 +26,46 @@ const LABELS: Record<string, string> = {
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+
+/** Month-over-month change chip next to a channel's amount. Renders nothing
+ * when there's no previous month to compare. */
+function DeltaBadge({
+  current,
+  previous,
+}: {
+  current: number;
+  previous: number | null | undefined;
+}) {
+  const d = revenueDelta(current, previous);
+  if (!d) return null;
+
+  if (d.direction === "flat") {
+    return (
+      <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+        <Minus className="size-3" />
+        flat
+      </span>
+    );
+  }
+  if (d.direction === "new") {
+    return (
+      <span className="flex items-center gap-0.5 text-xs text-primary">
+        <Sparkle className="size-3" />
+        new
+      </span>
+    );
+  }
+  const up = d.direction === "up";
+  return (
+    <span
+      className={`flex items-center gap-0.5 text-xs ${up ? "text-primary" : "text-warning"}`}
+      title={`${up ? "Up" : "Down"} ${d.pct}% vs last month`}
+    >
+      {up ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+      {d.pct}%
+    </span>
+  );
+}
 
 export function RevenueBySource({
   data,
@@ -78,10 +121,13 @@ export function RevenueBySource({
               const pct = Math.round((d.amount / total) * 100);
               return (
                 <div key={d.source}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
+                  <div className="mb-1 flex items-center justify-between gap-2 text-sm">
                     <span>{LABELS[d.source] ?? d.source}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {fmt(d.amount)}
+                    <span className="flex items-center gap-2">
+                      <DeltaBadge current={d.amount} previous={d.previousAmount} />
+                      <span className="tabular-nums text-muted-foreground">
+                        {fmt(d.amount)}
+                      </span>
                     </span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-foreground/5">
