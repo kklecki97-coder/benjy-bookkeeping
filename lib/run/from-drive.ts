@@ -1,5 +1,5 @@
 import "server-only";
-import { driveConnector } from "@/lib/drive/connector";
+import { driveConnector, resolveMonthFolder } from "@/lib/drive/connector";
 import { runMonthlyClose, type SourceInput, type RunResult } from "./orchestrate";
 import type { TransactionSource } from "@/types/transaction";
 
@@ -32,7 +32,11 @@ export async function runCloseFromDrive(
   folderId: string,
   userId: string | null,
 ): Promise<RunResult> {
-  const files = await driveConnector.listFiles(folderId);
+  // The configured folder is the "mother" folder; descend into the
+  // year → month subfolder for this run (falls back to the folder itself if
+  // it already holds files directly).
+  const monthFolderId = await resolveMonthFolder(folderId, monthYear);
+  const files = await driveConnector.listFiles(monthFolderId);
 
   const sources: SourceInput[] = [];
   for (const file of files) {
