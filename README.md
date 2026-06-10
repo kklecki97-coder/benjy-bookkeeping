@@ -56,10 +56,12 @@ npm run dev                         # http://localhost:3000
 | `QBO_CLIENT_SECRET` | same |
 | `QBO_REDIRECT_URI` | `http://localhost:3000/api/qbo/callback` (local) |
 | `QBO_ENVIRONMENT` | `sandbox` or `production` |
-| `SHOPIFY_STORE_DOMAIN` | Shopify admin -> custom app |
-| `SHOPIFY_ADMIN_TOKEN` | Shopify admin -> custom app (token) |
+| `SHOPIFY_STORE_DOMAIN` | e.g. `yourstore.myshopify.com` |
+| `SHOPIFY_CLIENT_ID` | Shopify Dev Dashboard app (client_credentials grant) |
+| `SHOPIFY_CLIENT_SECRET` | same |
+| `GOOGLE_SERVICE_ACCOUNT_KEY_B64` | base64 of the service-account JSON key; share the Drive month folder (read-only) with the key's `client_email` |
 | `RESEND_API_KEY` | resend.com -> API Keys |
-| `ENCRYPTION_KEY` | 32-byte hex: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `ENCRYPTION_KEY` | QBO tokens at rest, 32-byte hex: `openssl rand -hex 32` |
 
 **Never commit `.env.local` or the `samples/` folder — both are gitignored (client data).**
 

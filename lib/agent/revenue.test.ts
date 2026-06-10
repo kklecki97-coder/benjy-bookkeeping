@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { countsAsRevenue } from "./revenue";
+import { countsAsRevenue, isRevenueMirror } from "./revenue";
 
 describe("countsAsRevenue", () => {
   it("counts Hana Net Total Sales from the hana source", () => {
@@ -98,5 +98,50 @@ describe("countsAsRevenue", () => {
         description: "Order #1001",
       }),
     ).toBe(true);
+  });
+});
+
+describe("isRevenueMirror", () => {
+  it("flags a bank-deposit mirror of channel revenue (would double-count at post)", () => {
+    // a BoA deposit categorized as a sales channel = the mirror of an
+    // already-booked sale; posting it would be a second income entry
+    expect(
+      isRevenueMirror({ suggested_category: "Hana Sales", source: "boa_checking" }),
+    ).toBe(true);
+    expect(
+      isRevenueMirror({ suggested_category: "Shopify Sales", source: "boa_checking" }),
+    ).toBe(true);
+    expect(
+      isRevenueMirror({ suggested_category: "Honeybook Sales", source: "boa_checking" }),
+    ).toBe(true);
+  });
+
+  it("does NOT flag the channel's own sales line", () => {
+    expect(
+      isRevenueMirror({ suggested_category: "Hana Sales", source: "hana" }),
+    ).toBe(false);
+    expect(
+      isRevenueMirror({ suggested_category: "Shopify Sales", source: "shopify" }),
+    ).toBe(false);
+  });
+
+  it("does NOT flag a non-revenue category (expenses post normally)", () => {
+    expect(
+      isRevenueMirror({ suggested_category: "Cost of goods sold", source: "amex" }),
+    ).toBe(false);
+    expect(
+      isRevenueMirror({ suggested_category: "Bank Fees", source: "boa_checking" }),
+    ).toBe(false);
+  });
+
+  it("respects approved_category over suggested (owner edit)", () => {
+    // owner moved a boa deposit to a real expense → no longer a mirror
+    expect(
+      isRevenueMirror({
+        suggested_category: "Hana Sales",
+        approved_category: "Bank Fees",
+        source: "boa_checking",
+      }),
+    ).toBe(false);
   });
 });

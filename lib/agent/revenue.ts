@@ -35,6 +35,26 @@ const REVENUE_SOURCE: Record<string, string> = {
   "Retail Sales": "hana",
 };
 
+/**
+ * A "revenue mirror": a transaction categorized as a sales channel but coming
+ * from a DIFFERENT source than that channel's own report — i.e. a bank deposit
+ * reflecting money already booked as revenue from the channel's own line.
+ *
+ * The display layer already drops these from revenue totals (via countsAsRevenue)
+ * so the sale isn't counted twice. The SAME guard must apply at QBO post time:
+ * posting both the channel sales line AND its bank-deposit mirror would book the
+ * income twice in the real ledger.
+ */
+export function isRevenueMirror(tx: {
+  suggested_category?: string | null;
+  approved_category?: string | null;
+  source: string;
+}): boolean {
+  const category = tx.approved_category ?? tx.suggested_category ?? null;
+  if (!isRevenueCategory(category)) return false;
+  return REVENUE_SOURCE[category!] !== tx.source;
+}
+
 /** True only when this transaction should contribute to revenue totals. */
 export function countsAsRevenue(tx: {
   suggested_category?: string | null;
@@ -50,7 +70,7 @@ export function countsAsRevenue(tx: {
   const category = tx.approved_category ?? tx.suggested_category ?? null;
   if (!isRevenueCategory(category)) return false;
   // must come from the channel's own source, not a bank deposit mirror
-  if (REVENUE_SOURCE[category!] !== tx.source) return false;
+  if (isRevenueMirror(tx)) return false;
   // Hana emits overlapping summary lines — only the canonical one
   if (category === "Hana Sales") {
     return isCanonicalHanaRevenueLine(tx.description ?? "");
