@@ -2,7 +2,8 @@ import { createSSRClient } from "@/lib/supabase/ssr";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RunControls } from "@/components/run-controls";
 import { CategoryGroup, type GroupTx } from "@/components/category-group";
-import { ExceptionRow, type ExceptionTx } from "@/components/exception-row";
+import { type ExceptionTx } from "@/components/exception-row";
+import { ExceptionGroup } from "@/components/exception-group";
 import { SkippedRow } from "@/components/skipped-row";
 import { PostBar } from "@/components/post-bar";
 import { StatCards, type RunStats } from "@/components/stat-cards";
@@ -49,6 +50,7 @@ export default async function DashboardPage() {
 
   let groups: { category: string; txs: GroupTx[] }[] = [];
   let exceptions: ExceptionTx[] = [];
+  let exceptionGroups: { category: string; txs: ExceptionTx[] }[] = [];
   let skipped: { id: string; source: string; description: string; amount: number }[] = [];
   let failedCount = 0;
   let stats: RunStats = { total: 0, autoCategorized: 0, needReview: 0, revenue: 0 };
@@ -119,6 +121,17 @@ export default async function DashboardPage() {
       confidence: t.confidence,
       reasoning: t.reasoning,
     }));
+
+    // group exceptions by suggested category so the owner can act in bulk
+    const excByCat = new Map<string, ExceptionTx[]>();
+    for (const e of exceptions) {
+      const cat = e.suggested_category ?? "Uncategorized";
+      if (!excByCat.has(cat)) excByCat.set(cat, []);
+      excByCat.get(cat)!.push(e);
+    }
+    exceptionGroups = [...excByCat.entries()]
+      .map(([category, txs]) => ({ category, txs }))
+      .sort((a, b) => a.category.localeCompare(b.category));
 
     skipped = skippedTxs.map((t) => ({
       id: t.id,
@@ -267,8 +280,14 @@ export default async function DashboardPage() {
                       hint="Everything categorized cleanly — nothing needs your review."
                     />
                   ) : (
-                    exceptions.map((tx) => (
-                      <ExceptionRow key={tx.id} tx={tx} categories={categories} />
+                    exceptionGroups.map((g) => (
+                      <ExceptionGroup
+                        key={g.category}
+                        runId={run.id}
+                        category={g.category}
+                        transactions={g.txs}
+                        categories={categories}
+                      />
                     ))
                   )}
                 </TabsContent>

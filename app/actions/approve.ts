@@ -79,6 +79,70 @@ export async function approveCategory(runId: string, category: string) {
   return { ok: true, message: `Approved ${txs?.length ?? 0} in ${category}.` };
 }
 
+/** Skip every pending transaction with this suggested category (bulk remove). */
+export async function skipCategory(runId: string, category: string) {
+  const { supabase, user } = await requireUser();
+  if (!user) return { ok: false, message: "Not authenticated." };
+
+  const { data: txs } = await supabase
+    .from("transactions")
+    .select("id")
+    .eq("monthly_run_id", runId)
+    .eq("suggested_category", category)
+    .eq("status", "pending");
+
+  for (const t of txs ?? []) {
+    await supabase.from("transactions").update({ status: "skipped" }).eq("id", t.id);
+    await supabase.from("audit_log").insert({
+      monthly_run_id: runId,
+      transaction_id: t.id,
+      action: "skipped",
+      user_id: user.id,
+    });
+  }
+  revalidatePath("/dashboard");
+  return { ok: true, message: `Removed ${txs?.length ?? 0} from ${category}.` };
+}
+
+/** Move every pending transaction with this suggested category to a new one. */
+export async function recategorizeCategory(
+  runId: string,
+  fromCategory: string,
+  toCategory: string,
+) {
+  const { supabase, user } = await requireUser();
+  if (!user) return { ok: false, message: "Not authenticated." };
+  if (!toCategory.trim()) return { ok: false, message: "Pick a category." };
+
+  const { data: txs } = await supabase
+    .from("transactions")
+    .select("id")
+    .eq("monthly_run_id", runId)
+    .eq("suggested_category", fromCategory)
+    .eq("status", "pending");
+
+  for (const t of txs ?? []) {
+    await supabase
+      .from("transactions")
+      .update({
+        status: "manually_approved",
+        approved_category: toCategory,
+        approved_at: new Date().toISOString(),
+      })
+      .eq("id", t.id);
+    await supabase.from("audit_log").insert({
+      monthly_run_id: runId,
+      transaction_id: t.id,
+      action: "edited",
+      before_state: { category: fromCategory },
+      after_state: { category: toCategory },
+      user_id: user.id,
+    });
+  }
+  revalidatePath("/dashboard");
+  return { ok: true, message: `Moved ${txs?.length ?? 0} to ${toCategory}.` };
+}
+
 /** Accept Claude's suggestion for a single transaction. */
 export async function acceptSuggestion(txId: string) {
   const { supabase, user } = await requireUser();
