@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { NormalizedTransaction } from "@/types/transaction";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import {
   CategorizationBatchSchema,
   type Categorization,
@@ -58,25 +59,30 @@ export async function categorize(
 ): Promise<Categorization[]> {
   if (transactions.length === 0) return [];
 
-  const client = new Anthropic();
+  // maxRetries: the SDK retries 429/5xx with exponential backoff. Bumped above
+  // the default of 2 so a run survives transient rate-limit pressure on lower
+  // Anthropic usage tiers (e.g. 8k output tokens/min) without failing the close.
+  const client = new Anthropic({ maxRetries: 6 });
   const rulesContext = buildRulesContext(rules);
 
   // Batch to keep each response well under max_tokens. A single huge batch
   // overflows the output limit and returns truncated (invalid) JSON.
   const BATCH_SIZE = 40;
 
-  // Split into batches, then run them concurrently. The batches are fully
-  // independent (no batch needs another's result), so awaiting them one by one
-  // wasted wall-clock time — total time was the SUM of all batches. With
-  // Promise.all the total is the slowest SINGLE batch instead. Results are
-  // collected in batch order so output stays deterministic.
+  // Cap how many batches run at once. Firing all batches via Promise.all blew
+  // through the per-minute output-token rate limit on a full ~250-tx run
+  // (every batch answering in the same minute). A small concurrency cap keeps
+  // us under the limit while still overlapping a couple of requests. Results
+  // stay in batch order so output is deterministic.
+  const CONCURRENCY = 2;
+
   const batches: TxWithId[][] = [];
   for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
     batches.push(transactions.slice(i, i + BATCH_SIZE));
   }
 
-  const batchResults = await Promise.all(
-    batches.map((batch) => categorizeBatch(client, batch, rulesContext)),
+  const batchResults = await mapWithConcurrency(batches, CONCURRENCY, (batch) =>
+    categorizeBatch(client, batch, rulesContext),
   );
 
   return batchResults.flat();
