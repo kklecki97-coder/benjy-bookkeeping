@@ -104,7 +104,11 @@ export async function skipCategory(runId: string, category: string) {
   return { ok: true, message: `Removed ${txs?.length ?? 0} from ${category}.` };
 }
 
-/** Move every pending transaction with this suggested category to a new one. */
+/** Move every pending transaction with this suggested category to a new one,
+ * WITHOUT approving. They leave the exception queue and land in the new
+ * category as auto_approved ("to confirm"), so the owner still approves the
+ * group deliberately. suggested_category is updated (the dashboard groups by
+ * it); the original lands in the audit log. */
 export async function recategorizeCategory(
   runId: string,
   fromCategory: string,
@@ -125,9 +129,10 @@ export async function recategorizeCategory(
     await supabase
       .from("transactions")
       .update({
-        status: "manually_approved",
-        approved_category: toCategory,
-        approved_at: new Date().toISOString(),
+        status: "auto_approved",
+        suggested_category: toCategory,
+        approved_category: null,
+        approved_at: null,
       })
       .eq("id", t.id);
     await supabase.from("audit_log").insert({
@@ -140,7 +145,10 @@ export async function recategorizeCategory(
     });
   }
   revalidatePath("/dashboard");
-  return { ok: true, message: `Moved ${txs?.length ?? 0} to ${toCategory}.` };
+  return {
+    ok: true,
+    message: `Moved ${txs?.length ?? 0} to ${toCategory} — confirm them there.`,
+  };
 }
 
 /** Accept Claude's suggestion for a single transaction. */
@@ -282,7 +290,11 @@ export async function skipTransaction(txId: string) {
   return { ok: true, message: "Skipped." };
 }
 
-/** Move a transaction to a different category (and approve it there). */
+/** Move a transaction to a different category WITHOUT approving it. It lands in
+ * the new category as auto_approved ("to confirm"), so the owner still
+ * deliberately approves it there — moving is not the same as deciding it's
+ * final. We set suggested_category too (not just approved_category) because the
+ * dashboard groups by suggested_category; the original is kept in the audit log. */
 export async function recategorizeTransaction(txId: string, category: string) {
   const { supabase, user } = await requireUser();
   if (!user) return { ok: false, message: "Not authenticated." };
@@ -297,9 +309,10 @@ export async function recategorizeTransaction(txId: string, category: string) {
   await supabase
     .from("transactions")
     .update({
-      status: "manually_approved",
-      approved_category: category,
-      approved_at: new Date().toISOString(),
+      status: "auto_approved",
+      suggested_category: category,
+      approved_category: null,
+      approved_at: null,
     })
     .eq("id", txId);
   await supabase.from("audit_log").insert({
@@ -313,7 +326,7 @@ export async function recategorizeTransaction(txId: string, category: string) {
     user_id: user.id,
   });
   revalidatePath("/dashboard");
-  return { ok: true, message: `Moved to ${category}.` };
+  return { ok: true, message: `Moved to ${category} — confirm it there.` };
 }
 
 /** Restore a skipped transaction back into review (pending). */
