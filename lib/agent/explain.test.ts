@@ -126,4 +126,20 @@ describe("buildExplainPrompt — guardrails", () => {
     ).toLowerCase();
     expect(p).not.toContain("do not guess a category");
   });
+
+  it("flags decision weight for large amounts so the owner doesn't approve blindly", () => {
+    const p = buildExplainPrompt(
+      tx({ amount: -18000, suggested_category: "Owner draw", confidence: 72 }),
+      [],
+    ).toLowerCase();
+    expect(p).toContain("worth confirming before approving");
+  });
+
+  it("does NOT flag decision weight for small amounts (no scaremongering on a $3 fare)", () => {
+    const p = buildExplainPrompt(
+      tx({ amount: -3, suggested_category: "Travel & Transportation", confidence: 72 }),
+      [],
+    ).toLowerCase();
+    expect(p).not.toContain("worth confirming before approving");
+  });
 });

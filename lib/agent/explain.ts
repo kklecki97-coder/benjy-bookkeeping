@@ -65,6 +65,12 @@ export function buildExplainPrompt(tx: ExplainTx, candidateRules: RuleForAgent[]
     !!tx.suggested_category &&
     tx.suggested_category.toLowerCase().trim() !== "uncategorized";
 
+  // Large amounts where the category carries real bookkeeping/tax consequences
+  // (e.g. owner draw vs business expense) deserve an explicit nudge to confirm
+  // before approving — without scaremongering on small, clear charges.
+  const LARGE_AMOUNT = 1000;
+  const isLargeStakes = Math.abs(tx.amount) >= LARGE_AMOUNT;
+
   lines.push(
     "Explain to the business owner, in plain English, WHY this one was uncertain and what would resolve it.",
   );
@@ -96,6 +102,12 @@ export function buildExplainPrompt(tx: ExplainTx, candidateRules: RuleForAgent[]
   } else {
     lines.push(
       "- There is NO usable suggestion here and the description gives almost nothing to go on. Do NOT guess a category or offer a \"best guess\" — that would be inventing one. Instead, say plainly that you can't tell what this is from the description alone, and ask the owner for the specific missing context (e.g. what the check or charge was for) needed to categorize it.",
+    );
+  }
+
+  if (isLargeStakes) {
+    lines.push(
+      "- This is a large amount where the category choice has real consequences (e.g. owner draw vs a business expense are booked very differently). Make clear, in plain words, that this one is worth confirming before approving — not because anything is wrong, but because the stakes are high enough to double-check rather than approve on autopilot.",
     );
   }
 
