@@ -10,6 +10,7 @@ import {
   type SourceRevenue,
 } from "@/components/revenue-by-source";
 import { countsAsRevenue } from "@/lib/agent/revenue";
+import { getKnownCategories } from "@/lib/categories";
 import { EmptyState } from "@/components/empty-state";
 import { Inbox, CheckCircle2, FileUp } from "lucide-react";
 
@@ -27,6 +28,9 @@ export default async function DashboardPage() {
     .limit(1)
     .maybeSingle();
   const driveConnected = !!drive;
+
+  // categories the owner can pick from when editing an exception
+  const categories = await getKnownCategories();
 
   // most recent run
   const { data: run } = await supabase
@@ -200,7 +204,9 @@ export default async function DashboardPage() {
                       hint="Everything categorized cleanly — nothing needs your review."
                     />
                   ) : (
-                    exceptions.map((tx) => <ExceptionRow key={tx.id} tx={tx} />)
+                    exceptions.map((tx) => (
+                      <ExceptionRow key={tx.id} tx={tx} categories={categories} />
+                    ))
                   )}
                 </TabsContent>
               </Tabs>

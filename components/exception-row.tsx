@@ -24,7 +24,13 @@ export interface ExceptionTx {
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 
-export function ExceptionRow({ tx }: { tx: ExceptionTx }) {
+export function ExceptionRow({
+  tx,
+  categories = [],
+}: {
+  tx: ExceptionTx;
+  categories?: string[];
+}) {
   const [editing, setEditing] = useState(false);
   const [category, setCategory] = useState(tx.suggested_category ?? "");
   const [vendor, setVendor] = useState(tx.suggested_vendor ?? "");
@@ -59,11 +65,26 @@ export function ExceptionRow({ tx }: { tx: ExceptionTx }) {
 
       {editing ? (
         <div className="mt-3 flex flex-col gap-2">
-          <Input
-            placeholder="Category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          />
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={`cat-${tx.id}`}
+              className="text-xs text-muted-foreground"
+            >
+              Category — pick one or type your own
+            </label>
+            <Input
+              id={`cat-${tx.id}`}
+              list={`cats-${tx.id}`}
+              placeholder="Start typing or choose…"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            />
+            <datalist id={`cats-${tx.id}`}>
+              {categories.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </div>
           <Input
             placeholder="Vendor (optional)"
             value={vendor}

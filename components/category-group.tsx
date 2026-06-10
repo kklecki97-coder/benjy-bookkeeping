@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { approveCategory } from "@/app/actions/approve";
+import { X } from "lucide-react";
+import { approveCategory, skipTransaction } from "@/app/actions/approve";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -62,7 +63,7 @@ export function CategoryGroup({ runId, category, transactions }: CategoryGroupPr
           {transactions.map((t) => (
             <div
               key={t.id}
-              className="flex items-center justify-between gap-4 px-4 py-2 text-sm border-b border-border/50 last:border-0"
+              className="flex items-center justify-between gap-3 px-4 py-2 text-sm border-b border-border/50 last:border-0"
             >
               <span className="text-muted-foreground w-20 shrink-0 text-xs uppercase">
                 {t.source}
@@ -72,6 +73,20 @@ export function CategoryGroup({ runId, category, transactions }: CategoryGroupPr
                 <span className="text-muted-foreground text-xs">{t.confidence}%</span>
               )}
               <span className="tabular-nums w-24 text-right">{fmt(t.amount)}</span>
+              <button
+                type="button"
+                aria-label="Remove from this close (won't be posted)"
+                title="Remove — won't be posted to QuickBooks"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    await skipTransaction(t.id);
+                  })
+                }
+                className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+              >
+                <X className="size-4" />
+              </button>
             </div>
           ))}
         </div>
