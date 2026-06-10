@@ -24,7 +24,17 @@ export function encrypt(plaintext: string): string {
 }
 
 export function decrypt(payload: string): string {
-  const [ivHex, tagHex, dataHex] = payload.split(":");
+  const [ivHex, tagHex, dataHex] = (payload ?? "").split(":");
+  // Validate shape before handing to node:crypto, so a corrupt/empty stored
+  // token surfaces as a clean domain error (callers map it to "reconnect
+  // QuickBooks") instead of an opaque low-level crypto throw.
+  if (!ivHex || !tagHex || !dataHex) {
+    throw new Error("Stored token is malformed (expected iv:tag:ciphertext).");
+  }
+  if (ivHex.length !== 24 || tagHex.length !== 32) {
+    // 12-byte IV = 24 hex, 16-byte GCM tag = 32 hex
+    throw new Error("Stored token has an invalid IV/tag length.");
+  }
   const decipher = createDecipheriv("aes-256-gcm", getKey(), Buffer.from(ivHex, "hex"));
   decipher.setAuthTag(Buffer.from(tagHex, "hex"));
   return Buffer.concat([

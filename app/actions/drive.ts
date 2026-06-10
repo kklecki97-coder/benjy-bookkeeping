@@ -16,6 +16,11 @@ export async function saveDriveFolder(folderId: string) {
   const id =
     folderId.match(/folders\/([a-zA-Z0-9_-]+)/)?.[1] ?? folderId.trim();
   if (!id) return { ok: false, message: "Provide a folder ID or link." };
+  // Drive ids are URL-safe base64-ish; reject anything else before it ever
+  // reaches the Drive query string.
+  if (!/^[A-Za-z0-9_-]+$/.test(id)) {
+    return { ok: false, message: "That doesn't look like a valid Drive folder ID or link." };
+  }
 
   await setFolderId(id);
   revalidatePath("/settings");

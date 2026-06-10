@@ -85,7 +85,44 @@ export async function categorize(
     categorizeBatch(client, batch, rulesContext),
   );
 
-  return batchResults.flat();
+  // The model can drop a transaction from a batch (esp. near the output limit)
+  // or echo an id that wasn't sent. Reconcile so every input gets exactly one
+  // result: drop hallucinated ids, and force any missing one into the exception
+  // queue (low confidence) rather than silently leaving it uncategorized.
+  return reconcileResults(
+    transactions.map((t) => t.id),
+    batchResults.flat(),
+  );
+}
+
+/** Ensure the categorization output covers exactly the input ids: drop ids that
+ * weren't sent, and add a forced-exception result for any input id the model
+ * didn't return. Pure + testable. */
+export function reconcileResults(
+  inputIds: string[],
+  results: Categorization[],
+): Categorization[] {
+  const inputSet = new Set(inputIds);
+  const seen = new Set<string>();
+  const kept: Categorization[] = [];
+  for (const r of results) {
+    if (!inputSet.has(r.transaction_id)) continue; // hallucinated id — drop
+    if (seen.has(r.transaction_id)) continue; // duplicate — keep first
+    seen.add(r.transaction_id);
+    kept.push(r);
+  }
+  for (const id of inputIds) {
+    if (seen.has(id)) continue;
+    kept.push({
+      transaction_id: id,
+      suggested_category: "Uncategorized",
+      suggested_vendor: null,
+      confidence: 0,
+      reasoning: "Not returned by the categorizer — flagged for manual review.",
+      matched_rule_id: null,
+    });
+  }
+  return kept;
 }
 
 async function categorizeBatch(
