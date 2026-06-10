@@ -36,7 +36,12 @@ export function ExceptionGroup({
   const [open, setOpen] = useState(false);
   const [moving, setMoving] = useState(false);
   const [moveTo, setMoveTo] = useState("");
-  const [pending, startTransition] = useTransition();
+  // Separate transitions per bulk action so clicking "Move all" / "Remove all"
+  // never makes the "Approve all" button look like it was clicked too (they
+  // used to share one pending flag).
+  const [approvePending, startApprove] = useTransition();
+  const [movePending, startMove] = useTransition();
+  const [removePending, startRemove] = useTransition();
 
   const total = transactions.reduce((s, t) => s + t.amount, 0);
   const label = category || "Uncategorized";
@@ -79,7 +84,7 @@ export function ExceptionGroup({
       <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-2">
         <Button
           size="sm"
-          disabled={pending}
+          disabled={approvePending}
           onClick={() => {
             if (
               lowConf > 0 &&
@@ -89,18 +94,17 @@ export function ExceptionGroup({
             ) {
               return;
             }
-            startTransition(async () => {
+            startApprove(async () => {
               await approveCategory(runId, category);
             });
           }}
         >
           <Check className="size-3.5" />
-          Approve all as {label}
+          {approvePending ? "Approving…" : `Approve all as ${label}`}
         </Button>
         <Button
           size="sm"
           variant="outline"
-          disabled={pending}
           onClick={() => setMoving((m) => !m)}
         >
           <FolderInput className="size-3.5" />
@@ -109,21 +113,21 @@ export function ExceptionGroup({
         <Button
           size="sm"
           variant="ghost"
-          disabled={pending}
+          disabled={removePending}
           onClick={() => {
             if (
               window.confirm(
                 `Remove all ${transactions.length} transactions in "${label}"? They won't be posted.`,
               )
             ) {
-              startTransition(async () => {
+              startRemove(async () => {
                 await skipCategory(runId, category);
               });
             }
           }}
         >
           <X className="size-3.5" />
-          Remove all
+          {removePending ? "Removing…" : "Remove all"}
         </Button>
       </div>
 
@@ -139,16 +143,16 @@ export function ExceptionGroup({
           </div>
           <Button
             size="sm"
-            disabled={pending || !moveTo}
+            disabled={movePending || !moveTo}
             onClick={() =>
-              startTransition(async () => {
+              startMove(async () => {
                 await recategorizeCategory(runId, category, moveTo);
                 setMoving(false);
                 setMoveTo("");
               })
             }
           >
-            {pending ? "Moving…" : "Move all"}
+            {movePending ? "Moving…" : "Move all"}
           </Button>
           <Button size="sm" variant="outline" onClick={() => setMoving(false)}>
             Cancel
