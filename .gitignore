@@ -44,3 +44,9 @@ next-env.d.ts
 samples/
 .tmp/
 *.local.txt
+
+# diagnostic/throwaway scripts (touch real data via .env.local) — never commit
+scripts/
+
+# internal planning notes — not part of the product
+docs/PLAN-JUTRO.md
