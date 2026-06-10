@@ -54,10 +54,14 @@ export default async function DashboardPage() {
     }
   }
 
-  // most recent run
+  // Latest accounting period (month_year), tie-broken by start time. Ordering
+  // by month_year — not started_at — keeps "current run" consistent with the
+  // previous-month lookup the comparison chips and narrative use, so the
+  // dashboard shows the latest period and compares against the right prior one.
   const { data: run } = await supabase
     .from("monthly_runs")
     .select("id, month_year, status, started_at, narrative")
+    .order("month_year", { ascending: false })
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -75,7 +79,7 @@ export default async function DashboardPage() {
     const { data: txs } = await supabase
       .from("transactions")
       .select(
-        "id, source, description, amount, suggested_category, suggested_vendor, confidence, reasoning, status",
+        "id, source, description, amount, suggested_category, approved_category, suggested_vendor, confidence, reasoning, status",
       )
       .eq("monthly_run_id", run.id);
 
@@ -121,7 +125,7 @@ export default async function DashboardPage() {
     if (prevRun) {
       const { data: prevTxs } = await supabase
         .from("transactions")
-        .select("source, amount, suggested_category, status, description")
+        .select("source, amount, suggested_category, approved_category, status, description")
         .eq("monthly_run_id", prevRun.id);
       for (const t of (prevTxs ?? []).filter(countsAsRevenue)) {
         prevMap.set(

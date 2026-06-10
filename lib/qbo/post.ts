@@ -106,6 +106,7 @@ export class PostRecordedFailure extends Error {}
  */
 export async function postTransactions(
   runId: string,
+  userId: string | null,
   supabase: {
     from: (t: string) => {
       select: (c: string) => {
@@ -271,6 +272,7 @@ export async function postTransactions(
         transaction_id: tx.id,
         action: "posted",
         after_state: { qbo_journal_entry_id: jeId },
+        user_id: userId,
       });
       result.posted++;
     } catch (e) {
@@ -289,6 +291,7 @@ export async function postTransactions(
         transaction_id: tx.id,
         action: "post_failed",
         after_state: { error: msg },
+        user_id: userId,
       });
     }
   }

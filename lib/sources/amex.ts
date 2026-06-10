@@ -48,20 +48,25 @@ export const amexConnector: SourceConnector = {
       if (/Interest Charge|Pay Over Time.*Fee|^Fees?\b/i.test(rowText)) continue;
 
       const amount = findAmountInRow(row);
-      if (amount === null || amount <= 0) continue;
+      if (amount === null || amount === 0) continue;
+      // Payment lines are already filtered above (PAYMENT/AUTOPAY/THANK YOU), so
+      // a remaining NEGATIVE row is a merchant refund/return — keep it as a
+      // credit (negative) instead of dropping it, so it nets against the right
+      // expense category. Charges stay positive.
+      const signed = amount < 0 ? -Math.abs(amount) : Math.abs(amount);
 
       const date = toIso(row[0].text);
       // Description: strip leading date and trailing "$amount ⧫" / state markers.
       const desc = rowText
         .replace(/^\d{2}\/\d{2}\/\d{2}\s*/, "")
-        .replace(/\s*\$?[\d,]+\.\d{2}\s*[⧫*]?\s*$/, "")
+        .replace(/\s*-?\s*\$?[\d,]+\.\d{2}\s*[⧫*]?\s*$/, "")
         .trim();
 
       txs.push({
         source: "amex",
-        externalId: `amex_${currentCard}_${date}_${amount}_${shortHash(desc)}_${seq++}`,
+        externalId: `amex_${currentCard}_${date}_${Math.abs(amount)}_${shortHash(desc)}_${seq++}`,
         date,
-        amount: Math.abs(amount),
+        amount: signed,
         description: desc,
         rawData: { rowText, card: currentCard, page: row[0].page },
       });

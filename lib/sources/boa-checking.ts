@@ -37,6 +37,7 @@ export const boaCheckingConnector: SourceConnector = {
 
     const txs: NormalizedTransaction[] = [];
     let section: Section = "none";
+    let seq = 0; // disambiguates identical same-day/amount/desc rows (e.g. POS settlements)
 
     for (const row of rows) {
       const rowText = row.map((w) => w.text).join(" ");
@@ -67,7 +68,7 @@ export const boaCheckingConnector: SourceConnector = {
 
       txs.push({
         source: "boa_checking",
-        externalId: `boachk_${date}_${Math.abs(amount)}_${shortHash(desc)}`,
+        externalId: `boachk_${date}_${Math.abs(amount)}_${shortHash(desc)}_${seq++}`,
         date,
         amount: signed,
         description: desc,

@@ -145,7 +145,7 @@ export async function postToQbo(
   try {
     // postTransactions needs full DB access (service role) for updates + audit
     const supabase = createServiceClient();
-    const result = await postTransactions(runId, supabase as never);
+    const result = await postTransactions(runId, user.id, supabase as never);
 
     await supabase
       .from("monthly_runs")
