@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/approve";
 import { ExceptionRow, type ExceptionTx } from "@/components/exception-row";
 import { CategoryPicker } from "@/components/category-picker";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -42,6 +43,13 @@ export function ExceptionGroup({
   const [approvePending, startApprove] = useTransition();
   const [movePending, startMove] = useTransition();
   const [removePending, startRemove] = useTransition();
+  const [approveConfirm, setApproveConfirm] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState(false);
+
+  const doApprove = () =>
+    startApprove(async () => {
+      await approveCategory(runId, category);
+    });
 
   const total = transactions.reduce((s, t) => s + t.amount, 0);
   const label = category || "Uncategorized";
@@ -86,17 +94,8 @@ export function ExceptionGroup({
           size="sm"
           disabled={approvePending}
           onClick={() => {
-            if (
-              lowConf > 0 &&
-              !window.confirm(
-                `${lowConf} of these are below 70% confidence. Approve all ${transactions.length} as "${label}" anyway?`,
-              )
-            ) {
-              return;
-            }
-            startApprove(async () => {
-              await approveCategory(runId, category);
-            });
+            if (lowConf > 0) setApproveConfirm(true);
+            else doApprove();
           }}
         >
           <Check className="size-3.5" />
@@ -114,17 +113,7 @@ export function ExceptionGroup({
           size="sm"
           variant="ghost"
           disabled={removePending}
-          onClick={() => {
-            if (
-              window.confirm(
-                `Remove all ${transactions.length} transactions in "${label}"? They won't be posted.`,
-              )
-            ) {
-              startRemove(async () => {
-                await skipCategory(runId, category);
-              });
-            }
-          }}
+          onClick={() => setRemoveConfirm(true)}
         >
           <X className="size-3.5" />
           {removePending ? "Removing…" : "Remove all"}
@@ -168,6 +157,28 @@ export function ExceptionGroup({
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={approveConfirm}
+        onOpenChange={setApproveConfirm}
+        title={`Approve all ${transactions.length} as "${label}"?`}
+        description={`${lowConf} of these are below 70% confidence — worth a look before approving the whole group.`}
+        confirmLabel="Approve all"
+        onConfirm={doApprove}
+      />
+      <ConfirmDialog
+        open={removeConfirm}
+        onOpenChange={setRemoveConfirm}
+        title={`Remove all ${transactions.length} in "${label}"?`}
+        description="These won't be posted to QuickBooks. You can restore them later from the Skipped tab."
+        confirmLabel="Remove all"
+        destructive
+        onConfirm={() =>
+          startRemove(async () => {
+            await skipCategory(runId, category);
+          })
+        }
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { RotateCcw } from "lucide-react";
 import { resetRun } from "@/app/actions/reset-run";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 /**
  * "Reset this month" — deletes the current run so the owner can start over,
@@ -22,6 +23,7 @@ export function ResetRun({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const locked = postedCount > 0;
 
   return (
@@ -35,26 +37,29 @@ export function ResetRun({
             ? `${postedCount} transaction(s) already posted to QuickBooks — can't reset without drifting from your books.`
             : "Delete this run and start the month over (only before posting)."
         }
-        onClick={() => {
-          if (
-            !window.confirm(
-              `Reset ${monthYear}? This deletes the current run and everything you've reviewed so far. It can't be undone.`,
-            )
-          ) {
-            return;
-          }
-          setError(null);
-          startTransition(async () => {
-            const res = await resetRun(runId);
-            if (!res.ok) setError(res.message);
-          });
-        }}
+        onClick={() => setConfirmOpen(true)}
         className="text-muted-foreground hover:text-destructive"
       >
         <RotateCcw className="size-3.5" />
         {pending ? "Resetting…" : "Reset month"}
       </Button>
       {error && <span className="text-xs text-destructive">{error}</span>}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={`Reset ${monthYear}?`}
+        description="This deletes the current run and everything you've reviewed so far. It can't be undone."
+        confirmLabel="Reset month"
+        destructive
+        onConfirm={() => {
+          setError(null);
+          startTransition(async () => {
+            const res = await resetRun(runId);
+            if (!res.ok) setError(res.message);
+          });
+        }}
+      />
     </div>
   );
 }

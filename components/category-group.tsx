@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CategoryPicker } from "@/components/category-picker";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { groupApprovalState } from "@/lib/group-state";
 
 export interface GroupTx {
@@ -51,6 +52,12 @@ export function CategoryGroup({
   // used to flip the top button because both shared one pending flag.
   const [groupPending, startGroupTransition] = useTransition();
   const [rowPending, startRowTransition] = useTransition();
+  const [approveConfirm, setApproveConfirm] = useState(false);
+
+  const doApprove = () =>
+    startGroupTransition(async () => {
+      await approveCategory(runId, category);
+    });
 
   const total = transactions.reduce((s, t) => s + t.amount, 0);
   // Derive header state from work REMAINING, not every()-over-a-shrinking-set,
@@ -93,17 +100,8 @@ export function CategoryGroup({
           variant={fullyApproved ? "outline" : "default"}
           disabled={groupPending || buttonDisabled}
           onClick={() => {
-            if (
-              lowConfUnconfirmed > 0 &&
-              !window.confirm(
-                `${lowConfUnconfirmed} transaction(s) in "${category}" are below 70% confidence. Approve them anyway?`,
-              )
-            ) {
-              return;
-            }
-            startGroupTransition(async () => {
-              await approveCategory(runId, category);
-            });
+            if (lowConfUnconfirmed > 0) setApproveConfirm(true);
+            else doApprove();
           }}
         >
           {groupPending ? "Approving…" : buttonLabel}
@@ -201,6 +199,15 @@ export function CategoryGroup({
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={approveConfirm}
+        onOpenChange={setApproveConfirm}
+        title={`Approve "${category}" group?`}
+        description={`${lowConfUnconfirmed} transaction(s) here are below 70% confidence — worth a look before approving the whole group.`}
+        confirmLabel="Approve group"
+        onConfirm={doApprove}
+      />
     </div>
   );
 }
