@@ -25,6 +25,7 @@ export interface CategoryGroupProps {
   category: string;
   transactions: GroupTx[];
   categories?: string[];
+  qboAccountNames?: string[];
 }
 
 const fmt = (n: number) =>
@@ -35,7 +36,12 @@ export function CategoryGroup({
   category,
   transactions,
   categories = [],
+  qboAccountNames = [],
 }: CategoryGroupProps) {
+  // warn if this category has no matching QuickBooks account (would fail to post)
+  const noQboAccount =
+    qboAccountNames.length > 0 &&
+    !qboAccountNames.includes(category.toLowerCase().trim());
   const [open, setOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [moveTo, setMoveTo] = useState("");
@@ -65,6 +71,14 @@ export function CategoryGroup({
               title={`${lowConf} transaction(s) below 70% confidence — worth a look before approving`}
             >
               {lowConf} to check
+            </span>
+          )}
+          {noQboAccount && (
+            <span
+              className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs text-destructive"
+              title={`No matching QuickBooks account for "${category}". Create it in QBO (or move these) or they won't post.`}
+            >
+              no QBO account
             </span>
           )}
         </button>

@@ -25,11 +25,13 @@ export function ExceptionGroup({
   category,
   transactions,
   categories,
+  qboAccountNames = [],
 }: {
   runId: string;
   category: string;
   transactions: ExceptionTx[];
   categories: string[];
+  qboAccountNames?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [moving, setMoving] = useState(false);
@@ -42,6 +44,10 @@ export function ExceptionGroup({
   const lowConf = transactions.filter(
     (t) => t.confidence != null && t.confidence < 70,
   ).length;
+  const noQboAccount =
+    qboAccountNames.length > 0 &&
+    category !== "" &&
+    !qboAccountNames.includes(category.toLowerCase().trim());
 
   return (
     <div className="rounded-xl glass">
@@ -55,6 +61,14 @@ export function ExceptionGroup({
           />
           <span className="font-medium">{label}</span>
           <Badge variant="secondary">{transactions.length}</Badge>
+          {noQboAccount && (
+            <span
+              className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs text-destructive"
+              title={`No matching QuickBooks account for "${label}". Create it in QBO or move these, or they won't post.`}
+            >
+              no QBO account
+            </span>
+          )}
         </button>
         <span className="text-sm tabular-nums text-muted-foreground">
           {fmt(total)}

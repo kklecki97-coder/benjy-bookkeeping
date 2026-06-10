@@ -14,6 +14,7 @@ import {
 import { countsAsRevenue } from "@/lib/agent/revenue";
 import { getKnownCategories } from "@/lib/categories";
 import { isConnected as qboConnected, qboEnv } from "@/lib/qbo/oauth";
+import { accountMap } from "@/lib/qbo/accounts";
 import { EmptyState } from "@/components/empty-state";
 import { Inbox, CheckCircle2, FileUp, Sparkles } from "lucide-react";
 
@@ -39,6 +40,18 @@ export default async function DashboardPage() {
   // before review, not at the final Post click)
   const qboIsConnected = await qboConnected();
   const qboEnvironment = qboEnv();
+
+  // Lowercased QBO account names, so review can flag categories that have no
+  // matching account BEFORE posting. Empty set if QBO isn't connected/reachable
+  // (then we simply don't show the warning).
+  let qboAccountNames: string[] = [];
+  if (qboIsConnected) {
+    try {
+      qboAccountNames = [...(await accountMap()).keys()];
+    } catch {
+      qboAccountNames = [];
+    }
+  }
 
   // most recent run
   const { data: run } = await supabase
@@ -264,6 +277,7 @@ export default async function DashboardPage() {
                       category={g.category}
                       transactions={g.txs}
                       categories={categories}
+                      qboAccountNames={qboAccountNames}
                     />
                   ))
                 )}
@@ -287,6 +301,7 @@ export default async function DashboardPage() {
                         category={g.category}
                         transactions={g.txs}
                         categories={categories}
+                        qboAccountNames={qboAccountNames}
                       />
                     ))
                   )}
