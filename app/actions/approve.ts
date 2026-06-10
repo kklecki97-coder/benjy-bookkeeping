@@ -18,90 +18,97 @@ export async function approveAllAuto(runId: string) {
   const { supabase, user } = await requireUser();
   if (!user) return { ok: false, message: "Not authenticated." };
 
-  const { data: txs } = await supabase
+  // One bulk UPDATE (was a per-row loop). Categories vary across the run, so we
+  // don't copy suggested→approved_category here; posting falls back to
+  // approved_category ?? suggested_category (post.ts), and suggested_category is
+  // already set, so the approved categories are preserved correctly.
+  const { data: updated } = await supabase
     .from("transactions")
-    .select("id, suggested_category, suggested_vendor")
+    .update({
+      status: "manually_approved",
+      approved_at: new Date().toISOString(),
+    })
     .eq("monthly_run_id", runId)
-    .eq("status", "auto_approved");
+    .eq("status", "auto_approved")
+    .select("id");
 
-  for (const t of txs ?? []) {
-    await supabase
-      .from("transactions")
-      .update({
-        status: "manually_approved",
-        approved_category: t.suggested_category,
-        approved_vendor: t.suggested_vendor,
-        approved_at: new Date().toISOString(),
-      })
-      .eq("id", t.id);
-  }
+  const count = (updated ?? []).length;
   await supabase.from("audit_log").insert({
     monthly_run_id: runId,
     action: "approved_all_auto",
-    after_state: { count: txs?.length ?? 0 },
+    after_state: { count },
     user_id: user.id,
   });
   revalidatePath("/dashboard");
-  return { ok: true, message: `Approved ${txs?.length ?? 0} auto-categorized.` };
+  return { ok: true, message: `Approved ${count} auto-categorized.` };
 }
 
-/** Approve every pending/auto transaction in a category for a run. */
+/** Approve every pending/auto transaction in a category for a run.
+ * One bulk UPDATE + one bulk audit INSERT (was a per-row loop). Every row in
+ * the group shares this `category` (it's the grouping key), so approved_category
+ * is uniform; approved_vendor isn't used at post time (post.ts reads
+ * approved_category ?? suggested_category and ignores vendor), so we don't need
+ * to copy it per-row. */
 export async function approveCategory(runId: string, category: string) {
   const { supabase, user } = await requireUser();
   if (!user) return { ok: false, message: "Not authenticated." };
 
-  const { data: txs } = await supabase
+  const { data: updated } = await supabase
     .from("transactions")
-    .select("id, suggested_category, suggested_vendor")
+    .update({
+      status: "manually_approved",
+      approved_category: category,
+      approved_at: new Date().toISOString(),
+    })
     .eq("monthly_run_id", runId)
     .eq("suggested_category", category)
-    .in("status", ["pending", "auto_approved"]);
+    .in("status", ["pending", "auto_approved"])
+    .select("id");
 
-  for (const t of txs ?? []) {
-    await supabase
-      .from("transactions")
-      .update({
-        status: "manually_approved",
-        approved_category: t.suggested_category,
-        approved_vendor: t.suggested_vendor,
-        approved_at: new Date().toISOString(),
-      })
-      .eq("id", t.id);
-    await supabase.from("audit_log").insert({
-      monthly_run_id: runId,
-      transaction_id: t.id,
-      action: "approved",
-      after_state: { category: t.suggested_category },
-      user_id: user.id,
-    });
+  const ids = (updated ?? []).map((t) => t.id);
+  if (ids.length > 0) {
+    await supabase.from("audit_log").insert(
+      ids.map((id) => ({
+        monthly_run_id: runId,
+        transaction_id: id,
+        action: "approved",
+        after_state: { category },
+        user_id: user.id,
+      })),
+    );
   }
   revalidatePath("/dashboard");
-  return { ok: true, message: `Approved ${txs?.length ?? 0} in ${category}.` };
+  return { ok: true, message: `Approved ${ids.length} in ${category}.` };
 }
 
-/** Skip every pending transaction with this suggested category (bulk remove). */
+/** Skip every pending transaction with this suggested category (bulk remove).
+ * One bulk UPDATE + one bulk audit INSERT — not a per-row loop, which made
+ * large groups crawl through dozens of sequential round-trips. */
 export async function skipCategory(runId: string, category: string) {
   const { supabase, user } = await requireUser();
   if (!user) return { ok: false, message: "Not authenticated." };
 
-  const { data: txs } = await supabase
+  const { data: updated } = await supabase
     .from("transactions")
-    .select("id")
+    .update({ status: "skipped" })
     .eq("monthly_run_id", runId)
     .eq("suggested_category", category)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id");
 
-  for (const t of txs ?? []) {
-    await supabase.from("transactions").update({ status: "skipped" }).eq("id", t.id);
-    await supabase.from("audit_log").insert({
-      monthly_run_id: runId,
-      transaction_id: t.id,
-      action: "skipped",
-      user_id: user.id,
-    });
+  const ids = (updated ?? []).map((t) => t.id);
+  if (ids.length > 0) {
+    await supabase.from("audit_log").insert(
+      ids.map((id) => ({
+        monthly_run_id: runId,
+        transaction_id: id,
+        action: "skipped",
+        user_id: user.id,
+      })),
+    );
   }
   revalidatePath("/dashboard");
-  return { ok: true, message: `Removed ${txs?.length ?? 0} from ${category}.` };
+  return { ok: true, message: `Removed ${ids.length} from ${category}.` };
 }
 
 /** Move every pending transaction with this suggested category to a new one,
@@ -118,36 +125,37 @@ export async function recategorizeCategory(
   if (!user) return { ok: false, message: "Not authenticated." };
   if (!toCategory.trim()) return { ok: false, message: "Pick a category." };
 
-  const { data: txs } = await supabase
+  // One bulk UPDATE + one bulk audit INSERT (was a per-row loop).
+  const { data: updated } = await supabase
     .from("transactions")
-    .select("id")
+    .update({
+      status: "auto_approved",
+      suggested_category: toCategory,
+      approved_category: null,
+      approved_at: null,
+    })
     .eq("monthly_run_id", runId)
     .eq("suggested_category", fromCategory)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id");
 
-  for (const t of txs ?? []) {
-    await supabase
-      .from("transactions")
-      .update({
-        status: "auto_approved",
-        suggested_category: toCategory,
-        approved_category: null,
-        approved_at: null,
-      })
-      .eq("id", t.id);
-    await supabase.from("audit_log").insert({
-      monthly_run_id: runId,
-      transaction_id: t.id,
-      action: "edited",
-      before_state: { category: fromCategory },
-      after_state: { category: toCategory },
-      user_id: user.id,
-    });
+  const ids = (updated ?? []).map((t) => t.id);
+  if (ids.length > 0) {
+    await supabase.from("audit_log").insert(
+      ids.map((id) => ({
+        monthly_run_id: runId,
+        transaction_id: id,
+        action: "edited",
+        before_state: { category: fromCategory },
+        after_state: { category: toCategory },
+        user_id: user.id,
+      })),
+    );
   }
   revalidatePath("/dashboard");
   return {
     ok: true,
-    message: `Moved ${txs?.length ?? 0} to ${toCategory} — confirm them there.`,
+    message: `Moved ${ids.length} to ${toCategory} — confirm them there.`,
   };
 }
 
