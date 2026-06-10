@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CategoryPicker } from "@/components/category-picker";
+import { groupApprovalState } from "@/lib/group-state";
 
 export interface GroupTx {
   id: string;
@@ -48,11 +49,11 @@ export function CategoryGroup({
   const [pending, startTransition] = useTransition();
 
   const total = transactions.reduce((s, t) => s + t.amount, 0);
-  const allApproved = transactions.every((t) => t.status === "manually_approved");
-  // count low-confidence items so the owner doesn't bulk-approve weak guesses blind
-  const lowConf = transactions.filter(
-    (t) => t.confidence != null && t.confidence < 70,
-  ).length;
+  // Derive header state from work REMAINING, not every()-over-a-shrinking-set,
+  // so removing a row never silently flips the group to "Approved". See
+  // lib/group-state.ts for why.
+  const { fullyApproved, lowConfUnconfirmed, buttonLabel, buttonDisabled, showApprovedBadge } =
+    groupApprovalState(transactions);
 
   return (
     <div className="rounded-xl glass glass-hover">
@@ -64,13 +65,13 @@ export function CategoryGroup({
           <span className="text-muted-foreground text-xs">{open ? "▼" : "▶"}</span>
           <span className="font-medium">{category}</span>
           <Badge variant="secondary">{transactions.length}</Badge>
-          {allApproved && <Badge>approved</Badge>}
-          {!allApproved && lowConf > 0 && (
+          {showApprovedBadge && <Badge>approved</Badge>}
+          {!showApprovedBadge && lowConfUnconfirmed > 0 && (
             <span
               className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs text-warning"
-              title={`${lowConf} transaction(s) below 70% confidence — worth a look before approving`}
+              title={`${lowConfUnconfirmed} transaction(s) below 70% confidence — worth a look before approving`}
             >
-              {lowConf} to check
+              {lowConfUnconfirmed} to check
             </span>
           )}
           {noQboAccount && (
@@ -85,13 +86,13 @@ export function CategoryGroup({
         <span className="text-sm tabular-nums text-muted-foreground">{fmt(total)}</span>
         <Button
           size="sm"
-          variant={allApproved ? "outline" : "default"}
-          disabled={pending || allApproved}
+          variant={fullyApproved ? "outline" : "default"}
+          disabled={pending || buttonDisabled}
           onClick={() => {
             if (
-              lowConf > 0 &&
+              lowConfUnconfirmed > 0 &&
               !window.confirm(
-                `${lowConf} transaction(s) in "${category}" are below 70% confidence. Approve the whole group anyway?`,
+                `${lowConfUnconfirmed} transaction(s) in "${category}" are below 70% confidence. Approve them anyway?`,
               )
             ) {
               return;
@@ -101,7 +102,7 @@ export function CategoryGroup({
             });
           }}
         >
-          {allApproved ? "Approved" : pending ? "Approving…" : "Approve group"}
+          {pending ? "Approving…" : buttonLabel}
         </Button>
       </div>
 
