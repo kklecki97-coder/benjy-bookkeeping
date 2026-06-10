@@ -232,24 +232,25 @@ export default async function DashboardPage() {
               </p>
             </div>
           )}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="font-heading text-lg font-medium">
-                  Review — {run.month_year}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {autoCount} auto · {exceptions.length} to review
-                  {skipped.length > 0 && ` · ${skipped.length} skipped`}
-                  {failedCount > 0 && (
-                    <span className="text-destructive">
-                      {" "}· {failedCount} failed to post
-                    </span>
-                  )}
-                </p>
-              </div>
+          <RevenueBySource data={revenueBySource} horizontal />
 
-              <Tabs defaultValue="auto">
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-heading text-lg font-medium">
+                Review — {run.month_year}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {autoCount} auto · {exceptions.length} to review
+                {skipped.length > 0 && ` · ${skipped.length} skipped`}
+                {failedCount > 0 && (
+                  <span className="text-destructive">
+                    {" "}· {failedCount} failed to post
+                  </span>
+                )}
+              </p>
+            </div>
+
+            <Tabs defaultValue="auto">
               <TabsList>
                 <TabsTrigger value="auto">Auto-categorized ({autoCount})</TabsTrigger>
                 <TabsTrigger value="exceptions">
@@ -322,11 +323,6 @@ export default async function DashboardPage() {
                   </TabsContent>
                 )}
               </Tabs>
-            </div>
-
-            <div className="lg:col-span-1">
-              <RevenueBySource data={revenueBySource} />
-            </div>
           </div>
 
           <PostBar
@@ -336,17 +332,12 @@ export default async function DashboardPage() {
           />
         </section>
       ) : (
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <EmptyState
-              icon={FileUp}
-              title="No runs yet"
-              hint="Upload your source files above to start your first monthly close."
-            />
-          </div>
-          <div className="lg:col-span-1">
-            <RevenueBySource data={[]} />
-          </div>
+        <section>
+          <EmptyState
+            icon={FileUp}
+            title="No runs yet"
+            hint="Upload your source files above to start your first monthly close."
+          />
         </section>
       )}
     </>

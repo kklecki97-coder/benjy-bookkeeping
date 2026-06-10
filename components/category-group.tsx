@@ -112,16 +112,25 @@ export function CategoryGroup({
 
       {open && (
         <div className="border-t border-border">
+          {/* column headers — aligned with each row's columns below */}
+          <div className="flex items-center gap-3 px-4 pb-1.5 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+            <span className="w-20 shrink-0">Source</span>
+            <span className="flex-1">Transaction</span>
+            <span className="w-12 text-right">Conf.</span>
+            <span className="w-24 text-right">Amount</span>
+            {/* spacer matching the two action buttons (Move + Remove) */}
+            <span className="w-[3.75rem] shrink-0" aria-hidden />
+          </div>
           {transactions.map((t) => (
             <div key={t.id} className="border-b border-border/50 last:border-0">
               <div className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
                 <span className="text-muted-foreground w-20 shrink-0 text-xs uppercase">
                   {t.source}
                 </span>
-                <span className="flex-1 truncate">{t.description}</span>
-                {t.confidence != null && (
-                  <span className="text-muted-foreground text-xs">{t.confidence}%</span>
-                )}
+                <span className="flex-1">{t.description}</span>
+                <span className="text-muted-foreground w-12 text-right text-xs">
+                  {t.confidence != null ? `${t.confidence}%` : ""}
+                </span>
                 <span className="tabular-nums w-24 text-right">{fmt(t.amount)}</span>
                 <button
                   type="button"
