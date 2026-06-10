@@ -103,10 +103,12 @@ export function CategoryGroup({
           )}
         </button>
         <span className="text-sm tabular-nums text-muted-foreground">{fmt(total)}</span>
-        {canDisapprove && (
+        {fullyApproved ? (
+          // Fully approved: the CTA becomes a single red Disapprove (undo),
+          // replacing the dead "Approved" label. Only reachable before posting.
           <Button
             size="sm"
-            variant="ghost"
+            variant="destructive"
             disabled={disapprovePending}
             title="Undo approval — sends these back to 'to confirm' (only before posting)."
             onClick={() =>
@@ -114,22 +116,42 @@ export function CategoryGroup({
                 await disapproveCategory(runId, category);
               })
             }
-            className="text-muted-foreground hover:text-foreground"
           >
             {disapprovePending ? "Undoing…" : "Disapprove"}
           </Button>
+        ) : (
+          <>
+            {/* Mixed group: a quiet Disapprove to undo the already-approved
+                rows, sitting next to the main Approve action. */}
+            {canDisapprove && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={disapprovePending}
+                title="Undo the approved ones in this group (only before posting)."
+                onClick={() =>
+                  startDisapprove(async () => {
+                    await disapproveCategory(runId, category);
+                  })
+                }
+                className="text-muted-foreground hover:text-destructive"
+              >
+                {disapprovePending ? "Undoing…" : "Disapprove"}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="default"
+              disabled={groupPending || buttonDisabled}
+              onClick={() => {
+                if (lowConfUnconfirmed > 0) setApproveConfirm(true);
+                else doApprove();
+              }}
+            >
+              {groupPending ? "Approving…" : buttonLabel}
+            </Button>
+          </>
         )}
-        <Button
-          size="sm"
-          variant={fullyApproved ? "outline" : "default"}
-          disabled={groupPending || buttonDisabled}
-          onClick={() => {
-            if (lowConfUnconfirmed > 0) setApproveConfirm(true);
-            else doApprove();
-          }}
-        >
-          {groupPending ? "Approving…" : buttonLabel}
-        </Button>
       </div>
 
       {open && (
