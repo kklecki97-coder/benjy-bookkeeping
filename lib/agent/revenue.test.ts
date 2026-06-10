@@ -65,4 +65,38 @@ describe("countsAsRevenue", () => {
       }),
     ).toBe(false);
   });
+
+  it("excludes a skipped sale (removed in review must not count toward revenue)", () => {
+    expect(
+      countsAsRevenue({
+        suggested_category: "Hana Sales",
+        source: "hana",
+        description: "Hana — Net Total Sales",
+        status: "skipped",
+      }),
+    ).toBe(false);
+  });
+
+  it("still counts a sale with a non-skipped status", () => {
+    for (const status of ["pending", "auto_approved", "manually_approved", "posted"]) {
+      expect(
+        countsAsRevenue({
+          suggested_category: "Hana Sales",
+          source: "hana",
+          description: "Hana — Net Total Sales",
+          status,
+        }),
+      ).toBe(true);
+    }
+  });
+
+  it("counts a sale when status is omitted (back-compat)", () => {
+    expect(
+      countsAsRevenue({
+        suggested_category: "Shopify Sales",
+        source: "shopify",
+        description: "Order #1001",
+      }),
+    ).toBe(true);
+  });
 });

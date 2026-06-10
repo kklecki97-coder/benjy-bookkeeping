@@ -41,7 +41,12 @@ export function countsAsRevenue(tx: {
   approved_category?: string | null;
   source: string;
   description?: string | null;
+  status?: string | null;
 }): boolean {
+  // A sale the owner removed in review (skipped) is out of the close, so it
+  // must not count toward revenue — otherwise the totals contradict what the
+  // review screen shows and what posts to QuickBooks.
+  if (tx.status === "skipped") return false;
   const category = tx.approved_category ?? tx.suggested_category ?? null;
   if (!isRevenueCategory(category)) return false;
   // must come from the channel's own source, not a bank deposit mirror
