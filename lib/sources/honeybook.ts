@@ -58,37 +58,3 @@ export const honeybookConnector: SourceConnector = {
       });
   },
 };
-
-export interface BookedClient {
-  projectName: string;
-  projectType: string;
-  projectDate: string;
-  totalBookedValue: number;
-  totalPaid: number;
-}
-
-interface BookedRow {
-  "Project Name"?: string;
-  "Project Type"?: string;
-  "Project Date"?: string;
-  "Total Booked Value"?: string;
-  "Total Paid"?: string;
-}
-
-/** Parse the HoneyBook Booked Clients report (used later for A/R context). */
-export function parseBookedClients(path: string): BookedClient[] {
-  const csv = readFileSync(path, "utf8");
-  const { data } = Papa.parse<BookedRow>(csv, {
-    header: true,
-    skipEmptyLines: true,
-  });
-  return data
-    .filter((row) => row["Project Name"])
-    .map((row) => ({
-      projectName: (row["Project Name"] ?? "").trim(),
-      projectType: (row["Project Type"] ?? "").trim(),
-      projectDate: (row["Project Date"] ?? "").trim(),
-      totalBookedValue: parseFloat(row["Total Booked Value"] ?? "0") || 0,
-      totalPaid: parseFloat(row["Total Paid"] ?? "0") || 0,
-    }));
-}

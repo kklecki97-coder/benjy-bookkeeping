@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { honeybookConnector, parseBookedClients } from "./honeybook";
+import { honeybookConnector } from "./honeybook";
 
 const PAYMENTS = "samples/Honeybook April Payments.csv";
-const BOOKED = "samples/Honeybook April-2026-Booked Client-report.csv";
 
 describe("HoneyBook payments parser", () => {
   it("parses all 21 April payments (excludes the summary/total row)", async () => {
@@ -47,14 +46,5 @@ describe("HoneyBook payments parser", () => {
     });
     const ids = new Set(txs.map((t) => t.externalId));
     expect(ids.size).toBe(txs.length);
-  });
-});
-
-describe("HoneyBook booked clients parser", () => {
-  it("parses booked client rows with project values", async () => {
-    const booked = await parseBookedClients(BOOKED);
-    expect(booked.length).toBeGreaterThan(0);
-    expect(booked[0]).toHaveProperty("projectName");
-    expect(booked[0]).toHaveProperty("totalBookedValue");
   });
 });

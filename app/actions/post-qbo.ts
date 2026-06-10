@@ -145,6 +145,32 @@ export async function postToQbo(
   try {
     // postTransactions needs full DB access (service role) for updates + audit
     const supabase = createServiceClient();
+
+    // Only the newest run for a month may post. A month can be run more than
+    // once (re-run after a failure), leaving older "orphan" runs that still hold
+    // postable rows. Posting one of those — e.g. from a stale browser tab — would
+    // double-journal the month into QuickBooks. Refuse if this run was superseded.
+    const { data: thisRun } = await supabase
+      .from("monthly_runs")
+      .select("month_year")
+      .eq("id", runId)
+      .maybeSingle();
+    if (thisRun) {
+      const { data: newest } = await supabase
+        .from("monthly_runs")
+        .select("id")
+        .eq("month_year", thisRun.month_year)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (newest && newest.id !== runId) {
+        return {
+          ok: false,
+          message: `This run was superseded by a newer close for ${thisRun.month_year}. Open the latest one and post from there.`,
+        };
+      }
+    }
+
     const result = await postTransactions(runId, user.id, supabase as never);
 
     await supabase

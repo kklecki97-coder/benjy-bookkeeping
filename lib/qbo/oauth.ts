@@ -83,6 +83,17 @@ export async function getValidAccessToken(): Promise<{
     .maybeSingle();
   if (!conn) throw new Error("QuickBooks is not connected");
 
+  // The connection was authorized against one environment (sandbox/production),
+  // but the running app picks its QBO host from QBO_ENVIRONMENT. If someone
+  // flips that env var at go-live without reconnecting, a sandbox token would be
+  // sent to the production host — QBO answers an opaque 401. Fail fast with an
+  // owner-actionable message instead.
+  if (conn.environment && conn.environment !== qboEnv()) {
+    throw new Error(
+      `QuickBooks was connected to '${conn.environment}' but the app is now running against '${qboEnv()}'. Reconnect QuickBooks in Settings to continue.`,
+    );
+  }
+
   const expired =
     !conn.access_expires_at ||
     new Date(conn.access_expires_at).getTime() < Date.now() + 60_000;

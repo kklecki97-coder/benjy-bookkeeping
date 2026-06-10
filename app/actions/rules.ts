@@ -1,15 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSSRClient } from "@/lib/supabase/ssr";
-
-async function requireUser() {
-  const supabase = await createSSRClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return { supabase, user };
-}
+import { requireUser } from "@/lib/auth";
 
 export interface RuleInput {
   pattern: string;

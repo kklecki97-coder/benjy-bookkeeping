@@ -3,27 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSSRClient } from "@/lib/supabase/ssr";
 import { runMonthlyClose, type SourceInput } from "@/lib/run/orchestrate";
-import type { TransactionSource } from "@/types/transaction";
-
-/** Map an uploaded filename to its source connector. */
-function detectSource(filename: string): TransactionSource | null {
-  const f = filename.toLowerCase();
-  if (f.includes("honeybook") && f.includes("payment")) return "honeybook";
-  if (f.includes("hana")) return "hana";
-  if (f.includes("amex")) return "amex";
-  if (f.includes("credit")) return "boa_credit";
-  if (f.includes("checking") || f.includes("boa")) return "boa_checking";
-  return null;
-}
-
-function mimeFor(filename: string): string {
-  const f = filename.toLowerCase();
-  if (f.endsWith(".pdf")) return "application/pdf";
-  if (f.endsWith(".csv")) return "text/csv";
-  if (f.endsWith(".xlsx"))
-    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  return "application/octet-stream";
-}
+import { detectSource, mimeFor } from "@/lib/run/source-detect";
 
 export async function runClose(
   monthYear: string,
