@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { CategoryPicker } from "@/components/category-picker";
 
 export interface ExceptionTx {
   id: string;
@@ -70,20 +71,14 @@ export function ExceptionRow({
               htmlFor={`cat-${tx.id}`}
               className="text-xs text-muted-foreground"
             >
-              Category — pick one or type your own
+              Category
             </label>
-            <Input
+            <CategoryPicker
               id={`cat-${tx.id}`}
-              list={`cats-${tx.id}`}
-              placeholder="Start typing or choose…"
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={setCategory}
+              categories={categories}
             />
-            <datalist id={`cats-${tx.id}`}>
-              {categories.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
           </div>
           <Input
             placeholder="Vendor (optional)"

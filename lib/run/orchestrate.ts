@@ -9,6 +9,7 @@ import { boaCheckingConnector } from "@/lib/sources/boa-checking";
 import { amexConnector } from "@/lib/sources/amex";
 import { shopifyConnector } from "@/lib/sources/shopify";
 import { categorize, isException, type RuleForAgent } from "@/lib/agent/categorize";
+import { buildNarrativeFacts, generateNarrative } from "@/lib/agent/narrative";
 
 const CONNECTORS: Record<TransactionSource, SourceConnector> = {
   honeybook: honeybookConnector,
@@ -164,10 +165,48 @@ export async function runMonthlyClose(
     }
   }
 
+  // --- generate the plain-English month-in-review narrative (once, here) ---
+  let narrative = "";
+  try {
+    const { data: forNarrative } = await supabase
+      .from("transactions")
+      .select("source, amount, suggested_category, status, description")
+      .eq("monthly_run_id", runId);
+    const facts = buildNarrativeFacts(monthYear, forNarrative ?? []);
+
+    // Find the most recent earlier month's run to compare against (so the
+    // narrative can say "revenue up 11% from last month").
+    let previousFacts = null;
+    const { data: prevRun } = await supabase
+      .from("monthly_runs")
+      .select("id, month_year")
+      .lt("month_year", monthYear)
+      .neq("id", runId)
+      .order("month_year", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prevRun) {
+      const { data: prevTx } = await supabase
+        .from("transactions")
+        .select("source, amount, suggested_category, status, description")
+        .eq("monthly_run_id", prevRun.id);
+      previousFacts = buildNarrativeFacts(prevRun.month_year, prevTx ?? []);
+    }
+
+    narrative = await generateNarrative(facts, previousFacts);
+  } catch {
+    // a narrative failure must never fail the close
+    narrative = "";
+  }
+
   // --- finalize ---
   await supabase
     .from("monthly_runs")
-    .update({ status: "awaiting_approval", source_summary: sourceSummary })
+    .update({
+      status: "awaiting_approval",
+      source_summary: sourceSummary,
+      narrative: narrative || null,
+    })
     .eq("id", runId);
 
   await supabase.from("audit_log").insert({

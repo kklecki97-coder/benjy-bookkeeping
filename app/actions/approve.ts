@@ -218,6 +218,40 @@ export async function skipTransaction(txId: string) {
   return { ok: true, message: "Skipped." };
 }
 
+/** Move a transaction to a different category (and approve it there). */
+export async function recategorizeTransaction(txId: string, category: string) {
+  const { supabase, user } = await requireUser();
+  if (!user) return { ok: false, message: "Not authenticated." };
+  if (!category.trim()) return { ok: false, message: "Pick a category." };
+
+  const { data: before } = await supabase
+    .from("transactions")
+    .select("monthly_run_id, suggested_category, approved_category")
+    .eq("id", txId)
+    .single();
+
+  await supabase
+    .from("transactions")
+    .update({
+      status: "manually_approved",
+      approved_category: category,
+      approved_at: new Date().toISOString(),
+    })
+    .eq("id", txId);
+  await supabase.from("audit_log").insert({
+    monthly_run_id: before?.monthly_run_id ?? null,
+    transaction_id: txId,
+    action: "edited",
+    before_state: {
+      category: before?.approved_category ?? before?.suggested_category,
+    },
+    after_state: { category },
+    user_id: user.id,
+  });
+  revalidatePath("/dashboard");
+  return { ok: true, message: `Moved to ${category}.` };
+}
+
 /** Restore a skipped transaction back into review (pending). */
 export async function unskipTransaction(txId: string) {
   const { supabase, user } = await requireUser();

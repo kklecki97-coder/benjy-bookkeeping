@@ -14,7 +14,7 @@ import { countsAsRevenue } from "@/lib/agent/revenue";
 import { getKnownCategories } from "@/lib/categories";
 import { isConnected as qboConnected, qboEnv } from "@/lib/qbo/oauth";
 import { EmptyState } from "@/components/empty-state";
-import { Inbox, CheckCircle2, FileUp } from "lucide-react";
+import { Inbox, CheckCircle2, FileUp, Sparkles } from "lucide-react";
 
 function currentMonth(): string {
   // Static default; user can edit. Avoids Date.now() determinism concerns in tests.
@@ -42,7 +42,7 @@ export default async function DashboardPage() {
   // most recent run
   const { data: run } = await supabase
     .from("monthly_runs")
-    .select("id, month_year, status, started_at")
+    .select("id, month_year, status, started_at, narrative")
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -193,6 +193,19 @@ export default async function DashboardPage() {
 
       {run ? (
         <section className="flex flex-col gap-6">
+          {run.narrative && (
+            <div className="glass rounded-xl border-l-2 border-primary/50 p-5">
+              <div className="mb-2 flex items-center gap-2">
+                <Sparkles className="size-4 text-primary" />
+                <span className="text-xs font-medium uppercase tracking-wide text-primary">
+                  Month in review
+                </span>
+              </div>
+              <p className="text-sm leading-relaxed text-foreground/90">
+                {run.narrative}
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <div className="mb-4 flex items-center justify-between">
@@ -237,6 +250,7 @@ export default async function DashboardPage() {
                       runId={run.id}
                       category={g.category}
                       transactions={g.txs}
+                      categories={categories}
                     />
                   ))
                 )}

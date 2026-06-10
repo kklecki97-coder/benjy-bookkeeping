@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { X } from "lucide-react";
-import { approveCategory, skipTransaction } from "@/app/actions/approve";
+import { X, FolderInput } from "lucide-react";
+import {
+  approveCategory,
+  skipTransaction,
+  recategorizeTransaction,
+} from "@/app/actions/approve";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CategoryPicker } from "@/components/category-picker";
 
 export interface GroupTx {
   id: string;
@@ -19,13 +24,21 @@ export interface CategoryGroupProps {
   runId: string;
   category: string;
   transactions: GroupTx[];
+  categories?: string[];
 }
 
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 
-export function CategoryGroup({ runId, category, transactions }: CategoryGroupProps) {
+export function CategoryGroup({
+  runId,
+  category,
+  transactions,
+  categories = [],
+}: CategoryGroupProps) {
   const [open, setOpen] = useState(false);
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const [moveTo, setMoveTo] = useState("");
   const [pending, startTransition] = useTransition();
 
   const total = transactions.reduce((s, t) => s + t.amount, 0);
@@ -81,32 +94,81 @@ export function CategoryGroup({ runId, category, transactions }: CategoryGroupPr
       {open && (
         <div className="border-t border-border">
           {transactions.map((t) => (
-            <div
-              key={t.id}
-              className="flex items-center justify-between gap-3 px-4 py-2 text-sm border-b border-border/50 last:border-0"
-            >
-              <span className="text-muted-foreground w-20 shrink-0 text-xs uppercase">
-                {t.source}
-              </span>
-              <span className="flex-1 truncate">{t.description}</span>
-              {t.confidence != null && (
-                <span className="text-muted-foreground text-xs">{t.confidence}%</span>
+            <div key={t.id} className="border-b border-border/50 last:border-0">
+              <div className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
+                <span className="text-muted-foreground w-20 shrink-0 text-xs uppercase">
+                  {t.source}
+                </span>
+                <span className="flex-1 truncate">{t.description}</span>
+                {t.confidence != null && (
+                  <span className="text-muted-foreground text-xs">{t.confidence}%</span>
+                )}
+                <span className="tabular-nums w-24 text-right">{fmt(t.amount)}</span>
+                <button
+                  type="button"
+                  aria-label="Move to another category"
+                  title="Move to another category"
+                  disabled={pending}
+                  onClick={() => {
+                    setMovingId(movingId === t.id ? null : t.id);
+                    setMoveTo("");
+                  }}
+                  className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <FolderInput className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Remove from this close (won't be posted)"
+                  title="Remove — won't be posted to QuickBooks"
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await skipTransaction(t.id);
+                    })
+                  }
+                  className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              {movingId === t.id && (
+                <div className="flex items-end gap-2 px-4 pb-3">
+                  <div className="flex-1">
+                    <label className="text-xs text-muted-foreground">
+                      Move to category
+                    </label>
+                    <div className="mt-1">
+                      <CategoryPicker
+                        value={moveTo}
+                        onChange={setMoveTo}
+                        categories={categories}
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={pending || !moveTo}
+                    onClick={() =>
+                      startTransition(async () => {
+                        await recategorizeTransaction(t.id, moveTo);
+                        setMovingId(null);
+                        setMoveTo("");
+                      })
+                    }
+                  >
+                    {pending ? "Moving…" : "Move"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setMovingId(null)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               )}
-              <span className="tabular-nums w-24 text-right">{fmt(t.amount)}</span>
-              <button
-                type="button"
-                aria-label="Remove from this close (won't be posted)"
-                title="Remove — won't be posted to QuickBooks"
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await skipTransaction(t.id);
-                  })
-                }
-                className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
-              >
-                <X className="size-4" />
-              </button>
             </div>
           ))}
         </div>

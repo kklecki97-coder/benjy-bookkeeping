@@ -109,6 +109,7 @@ export type Database = {
           created_by: string | null
           id: string
           month_year: string
+          narrative: string | null
           source_summary: Json | null
           started_at: string
           status: string
@@ -119,6 +120,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           month_year: string
+          narrative?: string | null
           source_summary?: Json | null
           started_at?: string
           status?: string
@@ -129,6 +131,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           month_year?: string
+          narrative?: string | null
           source_summary?: Json | null
           started_at?: string
           status?: string
