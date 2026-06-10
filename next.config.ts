@@ -1,9 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Keep pdfjs as an external server package so its worker resolution works
-  // in the Next.js server runtime (otherwise it looks for a bundled worker file).
-  serverExternalPackages: ["pdfjs-dist"],
+  // Keep the PDF libraries external so their worker/polyfill resolution works
+  // in the Next.js server runtime. unpdf ships a serverless pdf.js build (used
+  // by lib/sources/pdf-utils.ts); pdfjs-dist stays listed in case it's pulled
+  // transitively, but is no longer imported directly.
+  serverExternalPackages: ["unpdf", "pdfjs-dist"],
   experimental: {
     serverActions: {
       // Monthly source files (AmEx ~800KB, BoA PDFs, Hana, etc.) can total a

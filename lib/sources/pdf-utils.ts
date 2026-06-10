@@ -9,19 +9,22 @@ export interface Word {
 
 /**
  * Extract every text token from a PDF with its x/y position and page.
- * Uses pdfjs-dist so amounts can be paired with descriptions by row (y),
+ * Uses unpdf's getTextContent items (which carry the same transform/position
+ * data as raw pdf.js) so amounts can be paired with descriptions by row (y),
  * which naive line-based text extraction gets wrong on bank statements.
+ *
+ * unpdf ships a serverless build of pdf.js with the browser-global polyfills
+ * baked in, so this works on Vercel's Node runtime — raw pdfjs-dist threw
+ * "DOMMatrix is not defined" there (the global exists in newer local Node but
+ * not in the serverless Node 20 runtime).
  */
 export async function extractWords(input: string | Buffer): Promise<Word[]> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const { getDocumentProxy } = await import("unpdf");
   const bytes =
     typeof input === "string"
       ? new Uint8Array(readFileSync(input))
       : new Uint8Array(input);
-  const doc = await pdfjs.getDocument({
-    data: bytes,
-    useSystemFonts: true,
-  }).promise;
+  const doc = await getDocumentProxy(bytes);
 
   const words: Word[] = [];
   for (let p = 1; p <= doc.numPages; p++) {
