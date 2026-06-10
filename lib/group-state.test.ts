@@ -4,22 +4,22 @@ import { groupApprovalState } from "./group-state";
 const s = (...statuses: string[]) => statuses.map((status) => ({ status }));
 
 describe("groupApprovalState", () => {
-  it("all auto_approved (nothing approved yet) → Approve N, no badge, enabled", () => {
+  it("all auto_approved (nothing approved yet) → Approve group, no badge, enabled", () => {
     const g = groupApprovalState(s("auto_approved", "auto_approved", "auto_approved"));
     expect(g.unconfirmed).toBe(3);
     expect(g.fullyApproved).toBe(false);
-    expect(g.buttonLabel).toBe("Approve 3");
+    expect(g.buttonLabel).toBe("Approve group");
     expect(g.buttonDisabled).toBe(false);
     expect(g.showApprovedBadge).toBe(false);
   });
 
-  it("mixed group → button counts only the unconfirmed ones", () => {
+  it("mixed group → still 'Approve group', stays enabled until all confirmed", () => {
     const g = groupApprovalState(
       s("manually_approved", "auto_approved", "auto_approved"),
     );
     expect(g.unconfirmed).toBe(2);
     expect(g.fullyApproved).toBe(false);
-    expect(g.buttonLabel).toBe("Approve 2");
+    expect(g.buttonLabel).toBe("Approve group");
     expect(g.showApprovedBadge).toBe(false);
   });
 
@@ -51,7 +51,7 @@ describe("groupApprovalState", () => {
   it("pending rows also count as unconfirmed (defensive — auto tab is auto/manual, but be safe)", () => {
     const g = groupApprovalState(s("pending", "manually_approved"));
     expect(g.unconfirmed).toBe(1);
-    expect(g.buttonLabel).toBe("Approve 1");
+    expect(g.buttonLabel).toBe("Approve group");
     expect(g.fullyApproved).toBe(false);
   });
 

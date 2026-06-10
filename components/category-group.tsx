@@ -46,7 +46,11 @@ export function CategoryGroup({
   const [open, setOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
   const [moveTo, setMoveTo] = useState("");
-  const [pending, startTransition] = useTransition();
+  // Two separate transitions so a row action (Remove/Move) never makes the
+  // group's Approve button show "Approving…" or go disabled — clicking the X
+  // used to flip the top button because both shared one pending flag.
+  const [groupPending, startGroupTransition] = useTransition();
+  const [rowPending, startRowTransition] = useTransition();
 
   const total = transactions.reduce((s, t) => s + t.amount, 0);
   // Derive header state from work REMAINING, not every()-over-a-shrinking-set,
@@ -87,7 +91,7 @@ export function CategoryGroup({
         <Button
           size="sm"
           variant={fullyApproved ? "outline" : "default"}
-          disabled={pending || buttonDisabled}
+          disabled={groupPending || buttonDisabled}
           onClick={() => {
             if (
               lowConfUnconfirmed > 0 &&
@@ -97,12 +101,12 @@ export function CategoryGroup({
             ) {
               return;
             }
-            startTransition(async () => {
+            startGroupTransition(async () => {
               await approveCategory(runId, category);
             });
           }}
         >
-          {pending ? "Approving…" : buttonLabel}
+          {groupPending ? "Approving…" : buttonLabel}
         </Button>
       </div>
 
@@ -123,7 +127,7 @@ export function CategoryGroup({
                   type="button"
                   aria-label="Move to another category"
                   title="Move to another category"
-                  disabled={pending}
+                  disabled={rowPending}
                   onClick={() => {
                     setMovingId(movingId === t.id ? null : t.id);
                     setMoveTo("");
@@ -136,9 +140,9 @@ export function CategoryGroup({
                   type="button"
                   aria-label="Remove from this close (won't be posted)"
                   title="Remove — won't be posted to QuickBooks"
-                  disabled={pending}
+                  disabled={rowPending}
                   onClick={() =>
-                    startTransition(async () => {
+                    startRowTransition(async () => {
                       await skipTransaction(t.id);
                     })
                   }
@@ -164,16 +168,16 @@ export function CategoryGroup({
                   </div>
                   <Button
                     size="sm"
-                    disabled={pending || !moveTo}
+                    disabled={rowPending || !moveTo}
                     onClick={() =>
-                      startTransition(async () => {
+                      startRowTransition(async () => {
                         await recategorizeTransaction(t.id, moveTo);
                         setMovingId(null);
                         setMoveTo("");
                       })
                     }
                   >
-                    {pending ? "Moving…" : "Move"}
+                    {rowPending ? "Moving…" : "Move"}
                   </Button>
                   <Button
                     size="sm"

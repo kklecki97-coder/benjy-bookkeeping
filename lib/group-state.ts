@@ -42,7 +42,7 @@ export function groupApprovalState(rows: GroupRow[]): GroupApprovalState {
     unconfirmed,
     fullyApproved,
     lowConfUnconfirmed,
-    buttonLabel: unconfirmed > 0 ? `Approve ${unconfirmed}` : "Approved",
+    buttonLabel: unconfirmed > 0 ? "Approve group" : "Approved",
     buttonDisabled: unconfirmed === 0,
     showApprovedBadge: fullyApproved,
   };
