@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ActivityLog } from "@/components/activity-log";
+import { CollapsibleCard } from "@/components/collapsible-card";
 import { countsAsRevenue } from "@/lib/agent/revenue";
 
 const fmtMoney = (n: number) =>
@@ -139,13 +140,36 @@ export default async function RunDetailPage({
         ))}
       </div>
 
-      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
+      <div className="flex flex-col gap-6">
+        {/* Failed-to-post reasons — first, since it's the actionable one */}
+        <CollapsibleCard title={`Couldn't post (${failed})`}>
+          <div className="flex flex-col gap-2">
+            {failures.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nothing failed — every approved entry posted.
+              </p>
+            ) : (
+              <>
+                <p className="mb-1 text-xs text-muted-foreground">
+                  These categories had no matching QuickBooks account:
+                </p>
+                {failures.map(([cat, n]) => (
+                  <div
+                    key={cat}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="text-muted-foreground">{cat}</span>
+                    <span className="tabular-nums font-medium">{n} tx</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </CollapsibleCard>
+
         {/* Breakdown by status */}
-        <Card className="h-full">
-          <CardHeader>
-            <CardTitle className="text-base">Breakdown by status</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
+        <CollapsibleCard title="Breakdown by status">
+          <div className="flex flex-col gap-2">
             <p className="mb-1 text-xs text-muted-foreground">
               Where the {all.length} transactions ended up:
             </p>
@@ -173,39 +197,8 @@ export default async function RunDetailPage({
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
-
-        {/* Failed-to-post reasons */}
-        <Card className="h-full">
-          <CardHeader>
-            <CardTitle className="text-base">
-              Couldn&apos;t post ({failed})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {failures.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nothing failed — every approved entry posted.
-              </p>
-            ) : (
-              <>
-                <p className="mb-1 text-xs text-muted-foreground">
-                  These categories had no matching QuickBooks account:
-                </p>
-                {failures.map(([cat, n]) => (
-                  <div
-                    key={cat}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span className="text-muted-foreground">{cat}</span>
-                    <span className="tabular-nums font-medium">{n} tx</span>
-                  </div>
-                ))}
-              </>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
       </div>
 
       {/* Audit trail */}

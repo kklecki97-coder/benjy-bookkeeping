@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { activityBucket } from "@/lib/activity-filter";
 
 export interface ActivityEntry {
   action: string;
@@ -16,7 +17,7 @@ export interface ActivityEntry {
   txSource?: string | null;
 }
 
-const COLLAPSED_COUNT = 8;
+const COLLAPSED_COUNT = 3;
 
 const SOURCE_LABELS: Record<string, string> = {
   hana: "Hana POS",
@@ -108,19 +109,61 @@ function txLine(a: ActivityEntry): string | null {
  * default. Each row shows the action with its concrete detail, plus the
  * specific transaction it acted on where applicable.
  */
+type Tab = "all" | "posted" | "skipped";
+
 export function ActivityLog({ entries }: { entries: ActivityEntry[] }) {
   const [expanded, setExpanded] = useState(false);
+  const [tab, setTab] = useState<Tab>("all");
 
   if (entries.length === 0) {
     return <p className="text-sm text-muted-foreground">No activity recorded.</p>;
   }
 
-  const hasMore = entries.length > COLLAPSED_COUNT;
-  const visible = expanded ? entries : entries.slice(0, COLLAPSED_COUNT);
+  const postedCount = entries.filter((e) => activityBucket(e.action) === "posted").length;
+  const skippedCount = entries.filter((e) => activityBucket(e.action) === "skipped").length;
+
+  const filtered =
+    tab === "all"
+      ? entries
+      : entries.filter((e) => activityBucket(e.action) === tab);
+
+  const hasMore = filtered.length > COLLAPSED_COUNT;
+  const visible = expanded ? filtered : filtered.slice(0, COLLAPSED_COUNT);
+
+  const tabs: { key: Tab; label: string; count: number }[] = [
+    { key: "all", label: "All", count: entries.length },
+    { key: "posted", label: "Posted", count: postedCount },
+    { key: "skipped", label: "Skipped", count: skippedCount },
+  ];
 
   return (
     <div className="flex flex-col">
-      {visible.map((a, i) => {
+      <div className="mb-2 flex gap-1">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => {
+              setTab(t.key);
+              setExpanded(false);
+            }}
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+              tab === t.key
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+            }`}
+          >
+            {t.label} {t.count}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="py-2 text-sm text-muted-foreground">
+          Nothing in this category.
+        </p>
+      ) : (
+        visible.map((a, i) => {
         const { action, detail } = describe(a);
         return (
           <div
@@ -138,7 +181,8 @@ export function ActivityLog({ entries }: { entries: ActivityEntry[] }) {
             </span>
           </div>
         );
-      })}
+        })
+      )}
 
       {hasMore && (
         <button
@@ -147,7 +191,7 @@ export function ActivityLog({ entries }: { entries: ActivityEntry[] }) {
           className="mt-2 flex cursor-pointer items-center justify-center gap-1 rounded-lg py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-expanded={expanded}
         >
-          {expanded ? "Show less" : `Show all ${entries.length} activities`}
+          {expanded ? "Show less" : `Show all ${filtered.length} activities`}
           <ChevronDown
             className={`size-4 transition-transform ${expanded ? "rotate-180" : ""}`}
             aria-hidden="true"
