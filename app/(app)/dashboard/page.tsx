@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createSSRClient } from "@/lib/supabase/ssr";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RunControls } from "@/components/run-controls";
@@ -198,6 +199,12 @@ export default async function DashboardPage() {
     run?.source_summary as Parameters<typeof failedSources>[0],
   );
 
+  // A fully-posted/closed month is "done": its review work shouldn't keep
+  // occupying the main dashboard. We zero the top stat cards and hide the
+  // transaction lists (the closed month lives in History); the Month-in-review
+  // narrative and Revenue-by-source stay as the month's summary.
+  const isClosed = run?.status === "complete";
+
   const autoCount = groups.reduce((s, g) => s + g.txs.length, 0);
   const allGroupTxs = groups.flatMap((g) => g.txs);
   // approved & ready to post
@@ -244,7 +251,13 @@ export default async function DashboardPage() {
           Live run progress is shown inside RunControls (the "Processing…" panel),
           so we don't duplicate it with a separate pipeline strip here. */}
       <div className="mb-8 flex flex-col gap-4">
-        <StatCards stats={stats} />
+        <StatCards
+          stats={
+            isClosed
+              ? { total: 0, autoCategorized: 0, needReview: 0, revenue: 0 }
+              : stats
+          }
+        />
       </div>
 
       <div className="mb-8">
@@ -303,6 +316,17 @@ export default async function DashboardPage() {
           )}
           <RevenueBySource data={revenueBySource} horizontal />
 
+          {isClosed ? (
+            <div className="glass rounded-xl p-5 text-sm text-muted-foreground">
+              <span className="text-foreground">{run.month_year} is closed.</span>{" "}
+              It&apos;s been posted to QuickBooks — see the full breakdown in{" "}
+              <Link href={`/history/${run.id}`} className="text-primary underline">
+                History
+              </Link>
+              . Run a new month above when you&apos;re ready.
+            </div>
+          ) : (
+          <>
           <div>
             <div className="mb-4 flex items-center justify-between gap-4">
               <h2 className="font-heading text-lg font-medium">
@@ -406,6 +430,8 @@ export default async function DashboardPage() {
             readyCount={readyCount}
             autoCount={pendingAutoCount}
           />
+          </>
+          )}
         </section>
       ) : (
         <section>
