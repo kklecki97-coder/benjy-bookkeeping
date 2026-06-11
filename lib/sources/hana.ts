@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import type { NormalizedTransaction } from "@/types/transaction";
 import { type ParseInput, type SourceConnector, shortHash } from "./types";
 import { extractWords, groupRowsByY, parseAmount } from "./pdf-utils";
@@ -40,13 +40,42 @@ function buildTx(
   };
 }
 
-function parseXlsx(path: string | Buffer): NormalizedTransaction[] {
-  const wb =
-    typeof path === "string"
-      ? XLSX.readFile(path)
-      : XLSX.read(path, { type: "buffer" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false });
+/** Read the first worksheet into a 2D array of stringified cells (like
+ * sheet_to_json with header:1). Uses exceljs — the npm `xlsx` package has
+ * unpatched prototype-pollution + ReDoS CVEs. */
+async function readXlsxRows(path: string | Buffer): Promise<string[][]> {
+  const wb = new ExcelJS.Workbook();
+  if (typeof path === "string") {
+    await wb.xlsx.readFile(path);
+  } else {
+    // exceljs wants an ArrayBuffer-ish input
+    await wb.xlsx.load(path as unknown as ArrayBuffer);
+  }
+  const ws = wb.worksheets[0];
+  if (!ws) return [];
+  const rows: string[][] = [];
+  ws.eachRow({ includeEmpty: true }, (row) => {
+    const cells: string[] = [];
+    // row.values is 1-indexed (index 0 is unused); flatten to a 0-based array
+    const vals = row.values as unknown[];
+    for (let i = 1; i < vals.length; i++) {
+      const v = vals[i];
+      // exceljs may return rich-text/formula objects — coerce to plain text
+      if (v != null && typeof v === "object" && "result" in (v as object)) {
+        cells.push(String((v as { result: unknown }).result ?? ""));
+      } else if (v != null && typeof v === "object" && "text" in (v as object)) {
+        cells.push(String((v as { text: unknown }).text ?? ""));
+      } else {
+        cells.push(String(v ?? ""));
+      }
+    }
+    rows.push(cells);
+  });
+  return rows;
+}
+
+async function parseXlsx(path: string | Buffer): Promise<NormalizedTransaction[]> {
+  const rows = await readXlsxRows(path);
 
   // Derive month-year from the "Order dates:" cell (e.g. "4/1/2026 - 4/30/2026").
   let monthYear = "";

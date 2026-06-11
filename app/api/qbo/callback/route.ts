@@ -22,7 +22,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", url.origin));
   }
 
-  if (!code || !realmId) {
+  // realmId must be a numeric company id. Validate the shape before persisting
+  // it (it gets interpolated into QBO API URL paths) so a malformed value fails
+  // fast here with a clear error instead of a confusing later QBO 4xx.
+  if (!code || !realmId || !/^\d{1,20}$/.test(realmId)) {
     dashboard.searchParams.set("qbo", "error");
     return NextResponse.redirect(dashboard);
   }

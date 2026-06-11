@@ -328,8 +328,18 @@ async function postWithBackoff(
     return postWithBackoff(realmId, token, je, attempt + 1);
   }
   if (!res.ok) {
+    // Log the raw Intuit fault server-side for debugging, but don't surface it
+    // to the owner (it can carry internal validation/account detail and clutters
+    // the UI). Return a stable, actionable message instead.
     const text = await res.text();
-    throw new Error(`QBO post failed ${res.status}: ${text.slice(0, 200)}`);
+    console.error(`QBO post failed ${res.status}:`, text.slice(0, 500));
+    const hint =
+      res.status === 400
+        ? " — usually a missing or closed account; check the account mapping"
+        : res.status === 401 || res.status === 403
+          ? " — reconnect QuickBooks in Settings"
+          : "";
+    throw new Error(`QuickBooks rejected this entry (HTTP ${res.status})${hint}.`);
   }
   return res.json();
 }

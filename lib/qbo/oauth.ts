@@ -63,7 +63,7 @@ export async function exchangeCode(code: string, realmId: string): Promise<void>
   await supabase.from("qbo_connection").delete().neq("id", "00000000-0000-0000-0000-000000000000");
   await supabase.from("qbo_connection").insert({
     realm_id: realmId,
-    access_token: tokens.access_token,
+    access_token: encrypt(tokens.access_token),
     refresh_token_enc: encrypt(tokens.refresh_token),
     access_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
     environment: qboEnv(),
@@ -99,7 +99,16 @@ export async function getValidAccessToken(): Promise<{
     new Date(conn.access_expires_at).getTime() < Date.now() + 60_000;
 
   if (!expired && conn.access_token) {
-    return { token: conn.access_token, realmId: conn.realm_id };
+    // access_token is stored encrypted (like the refresh token). Fall back to
+    // treating it as plaintext for any row written before this change, so an
+    // existing connection keeps working without a forced reconnect.
+    let token: string;
+    try {
+      token = decrypt(conn.access_token);
+    } catch {
+      token = conn.access_token;
+    }
+    return { token, realmId: conn.realm_id };
   }
 
   // refresh
@@ -122,7 +131,7 @@ export async function getValidAccessToken(): Promise<{
   await supabase
     .from("qbo_connection")
     .update({
-      access_token: tokens.access_token,
+      access_token: encrypt(tokens.access_token),
       refresh_token_enc: encrypt(tokens.refresh_token),
       access_expires_at: new Date(
         Date.now() + tokens.expires_in * 1000,
