@@ -321,7 +321,21 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      qbo_status: {
+        Row: {
+          environment: string | null
+          connected: boolean | null
+        }
+        Relationships: []
+      }
+      drive_status: {
+        Row: {
+          folder_id: string | null
+          account_email: string | null
+          connected: boolean | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

@@ -26,14 +26,16 @@ export default async function SettingsPage() {
     .select("id, rule_type, pattern, category, vendor, priority")
     .order("priority", { ascending: true });
 
+  // Read connection STATUS from non-secret views (qbo_status/drive_status), not
+  // the token tables — those are no longer client-readable (migration 0007).
   const { data: qbo } = await supabase
-    .from("qbo_connection")
+    .from("qbo_status")
     .select("environment")
     .limit(1)
     .maybeSingle();
 
   const { data: drive } = await supabase
-    .from("drive_connection")
+    .from("drive_status")
     .select("folder_id")
     .limit(1)
     .maybeSingle();

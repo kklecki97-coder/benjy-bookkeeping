@@ -28,12 +28,13 @@ function currentMonth(): string {
 export default async function DashboardPage() {
   const supabase = await createSSRClient();
 
+  // Status via the non-secret view (token table isn't client-readable — 0007).
   const { data: drive } = await supabase
-    .from("drive_connection")
-    .select("id")
+    .from("drive_status")
+    .select("connected")
     .limit(1)
     .maybeSingle();
-  const driveConnected = !!drive;
+  const driveConnected = !!drive?.connected;
 
   // categories the owner can pick from when editing an exception
   const categories = await getKnownCategories();
