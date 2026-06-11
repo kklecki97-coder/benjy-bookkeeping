@@ -16,8 +16,9 @@ import { countsAsRevenue } from "@/lib/agent/revenue";
 import { getKnownCategories } from "@/lib/categories";
 import { isConnected as qboConnected, qboEnv } from "@/lib/qbo/oauth";
 import { accountMap } from "@/lib/qbo/accounts";
+import { failedSources, sourceLabel } from "@/lib/source-summary";
 import { EmptyState } from "@/components/empty-state";
-import { Inbox, CheckCircle2, FileUp, Sparkles } from "lucide-react";
+import { Inbox, CheckCircle2, FileUp, Sparkles, AlertTriangle } from "lucide-react";
 
 function currentMonth(): string {
   // Static default; user can edit. Avoids Date.now() determinism concerns in tests.
@@ -60,7 +61,7 @@ export default async function DashboardPage() {
   // dashboard shows the latest period and compares against the right prior one.
   const { data: run } = await supabase
     .from("monthly_runs")
-    .select("id, month_year, status, started_at, narrative")
+    .select("id, month_year, status, started_at, narrative, source_summary")
     .order("month_year", { ascending: false })
     .order("started_at", { ascending: false })
     .limit(1)
@@ -189,6 +190,13 @@ export default async function DashboardPage() {
     failedCount = failedTxs.length;
   }
 
+  // Sources that errored during ingestion — a run can finish looking complete
+  // while silently missing a whole channel. Surface this so the owner doesn't
+  // post an incomplete month.
+  const failed = failedSources(
+    run?.source_summary as Parameters<typeof failedSources>[0],
+  );
+
   const autoCount = groups.reduce((s, g) => s + g.txs.length, 0);
   const allGroupTxs = groups.flatMap((g) => g.txs);
   // approved & ready to post
@@ -253,6 +261,32 @@ export default async function DashboardPage() {
 
       {run ? (
         <section className="flex flex-col gap-6">
+          {failed.length > 0 && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                <div className="flex flex-col gap-1 text-sm">
+                  <span className="font-medium text-destructive">
+                    {failed.length === 1
+                      ? "A source didn't import — this month may be incomplete."
+                      : `${failed.length} sources didn't import — this month may be incomplete.`}
+                  </span>
+                  <ul className="text-muted-foreground">
+                    {failed.map((f) => (
+                      <li key={f.source}>
+                        <span className="text-foreground/90">{sourceLabel(f.source)}</span>:{" "}
+                        {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                  <span className="text-xs text-muted-foreground">
+                    Fix the source and re-run before posting, or post knowing this
+                    channel is missing.
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
           {run.narrative && (
             <div className="glass rounded-xl border-l-2 border-primary/50 p-5">
               <div className="mb-2 flex items-center gap-2">
