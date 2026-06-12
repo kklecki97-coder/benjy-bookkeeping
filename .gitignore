@@ -52,3 +52,6 @@ scripts/
 
 # internal planning notes — not part of the product
 docs/PLAN-JUTRO.md
+
+# git worktrees — isolated workspaces, never commit
+.worktrees/
