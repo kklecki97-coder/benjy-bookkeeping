@@ -53,4 +53,32 @@ describe("pre-post account check", () => {
     expect(result.missing).toEqual([]);
     expect(result.matchedCount).toBe(0);
   });
+
+  it("does NOT flag a safe-aliased category as missing", () => {
+    // We post "Software subscriptions" to the client's "Software & apps"
+    // account, so the preview must consider it resolvable — not missing.
+    const withAlias = new Set(["software & apps", "checking"]);
+    const result = analyzePostability(
+      [{ category: "Software subscriptions", count: 7 }],
+      withAlias,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.missing).toEqual([]);
+    expect(result.matchedCount).toBe(7);
+  });
+
+  it("DOES flag owner-decision categories as missing (warn before posting)", () => {
+    // These need an accounting decision; surface them so the owner is warned.
+    const result = analyzePostability(
+      [
+        { category: "Utilities", count: 2 },
+        { category: "Owner draw", count: 3 },
+      ],
+      accounts,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.missing).toEqual([{ category: "Owner draw", count: 3 }]);
+    expect(result.missingCount).toBe(3);
+    expect(result.matchedCount).toBe(2);
+  });
 });

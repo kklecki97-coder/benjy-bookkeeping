@@ -1,6 +1,13 @@
 import { getValidAccessToken, apiBase } from "./oauth";
-import { accountMap } from "./accounts";
+import { accountMap, type QboAccount } from "./accounts";
 import { isRevenueMirror } from "@/lib/agent/revenue";
+import type { TransactionSource } from "@/types/transaction";
+import {
+  categoryNormalSide,
+  flipSide,
+  resolveBankAccount,
+  resolveCategoryAccount,
+} from "./routing";
 
 export interface PostableTx {
   id: string;
@@ -12,8 +19,10 @@ export interface PostableTx {
 }
 
 export interface JournalAccounts {
-  expenseAccountId: string;
-  bankAccountId: string;
+  /** The account for what was bought/sold (its AccountType drives direction). */
+  category: QboAccount;
+  /** The bank/credit-card account the money moved through. */
+  bank: QboAccount;
 }
 
 interface JournalLine {
@@ -34,40 +43,53 @@ export interface JournalEntry {
 
 /**
  * Build a balanced double-entry journal entry.
- * Negative amount = expense (debit expense, credit bank).
- * Positive amount = income (debit bank, credit income).
+ *
+ * Direction comes from the CATEGORY account's type, NOT the amount sign — real
+ * source data has positive amounts for both expenses and income, so sign alone
+ * would post expenses as income. The category line's "normal" side (amount >= 0)
+ * is Debit for Expense/COGS/Equity, Credit for Income/Liability. A negative
+ * amount (refund/return) flips it. The bank line is always the opposite side.
+ *
+ * Throws if the category account has a type with no defined direction (e.g. a
+ * Bank/AR/AP account) — callers must resolve a sensible category first, and
+ * `postTransactions` guards this before calling so it never throws in practice.
  */
 export function buildJournalEntry(
   tx: PostableTx,
   accounts: JournalAccounts,
 ): JournalEntry {
   const abs = Math.abs(tx.amount);
-  const isExpense = tx.amount < 0;
 
-  const debit: JournalLine = {
+  const normalSide = categoryNormalSide(accounts.category.AccountType);
+  if (!normalSide) {
+    throw new Error(
+      `Cannot determine debit/credit direction for account "${accounts.category.Name}" (type "${accounts.category.AccountType}").`,
+    );
+  }
+  // A negative amount reverses the entry (refund, return, payment).
+  const categorySide = tx.amount < 0 ? flipSide(normalSide) : normalSide;
+  const bankSide = flipSide(categorySide);
+
+  const categoryLine: JournalLine = {
     Amount: abs,
     DetailType: "JournalEntryLineDetail",
     Description: tx.description,
     JournalEntryLineDetail: {
-      PostingType: "Debit",
-      AccountRef: {
-        value: isExpense ? accounts.expenseAccountId : accounts.bankAccountId,
-      },
+      PostingType: categorySide,
+      AccountRef: { value: accounts.category.Id },
     },
   };
-  const credit: JournalLine = {
+  const bankLine: JournalLine = {
     Amount: abs,
     DetailType: "JournalEntryLineDetail",
     Description: tx.description,
     JournalEntryLineDetail: {
-      PostingType: "Credit",
-      AccountRef: {
-        value: isExpense ? accounts.bankAccountId : accounts.expenseAccountId,
-      },
+      PostingType: bankSide,
+      AccountRef: { value: accounts.bank.Id },
     },
   };
   const je: JournalEntry = {
-    Line: [debit, credit],
+    Line: [categoryLine, bankLine],
     PrivateNote: `txid:${tx.id}`,
   };
   // Stamp the period the transaction occurred in. Without this QBO defaults
@@ -214,32 +236,53 @@ export async function postTransactions(
 
     // Auto-approved transactions carry only suggested_category; fall back to it.
     const effectiveCategory = tx.approved_category ?? tx.suggested_category;
-    const category = (effectiveCategory ?? "").toLowerCase().trim();
-    const expenseAccount = accounts.get(category);
-    const bank = accounts.get("checking") || accounts.get("bank");
 
-    if (!expenseAccount || !bank) {
+    // Record a failed post with a clear, owner-actionable reason and move on.
+    const failPost = async (error: string) => {
       result.failed++;
-      result.errors.push({
-        txId: tx.id,
-        error: `No QBO account for "${effectiveCategory}"`,
-      });
+      result.errors.push({ txId: tx.id, error });
       await supabase
         .from("transactions")
-        .update({
-          status: "post_failed",
-          qbo_post_error: `No matching QBO account: ${effectiveCategory}`,
-        })
+        .update({ status: "post_failed", qbo_post_error: error })
         .eq("id", tx.id);
+    };
+
+    // Resolve the category account (exact name, then safe alias). Owner-decision
+    // categories fail loudly rather than guess at an equity/loan account.
+    const catResult = resolveCategoryAccount(effectiveCategory ?? "", accounts);
+    if (!catResult.ok) {
+      await failPost(
+        catResult.reason === "owner_decision"
+          ? `Needs owner decision — no account assigned yet for "${catResult.category}".`
+          : `No matching QBO account: ${catResult.category}`,
+      );
+      continue;
+    }
+
+    // Resolve the bank/card account by source. Sales channels (shopify/hana/
+    // honeybook) have no confirmed clearing account yet → owner decision.
+    const bankResult = resolveBankAccount(tx.source as TransactionSource, accounts);
+    if (!bankResult.ok) {
+      await failPost(
+        bankResult.reason === "owner_decision"
+          ? `Needs owner decision — no bank/clearing account confirmed for source "${tx.source}".`
+          : `No QuickBooks account named "${bankResult.accountName}" for source "${tx.source}".`,
+      );
+      continue;
+    }
+
+    // Guard the direction: a category mapped to an account whose type has no
+    // defined debit/credit side (e.g. a Bank/AR/AP account) must not post.
+    if (!categoryNormalSide(catResult.account.AccountType)) {
+      await failPost(
+        `Unsupported account type "${catResult.account.AccountType}" for "${effectiveCategory}" — can't tell debit from credit.`,
+      );
       continue;
     }
 
     const je = buildJournalEntry(
       { ...tx, date: tx.transaction_date },
-      {
-        expenseAccountId: expenseAccount.Id,
-        bankAccountId: bank.Id,
-      },
+      { category: catResult.account, bank: bankResult.account },
     );
 
     try {
