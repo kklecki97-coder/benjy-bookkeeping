@@ -1,3 +1,5 @@
+import { categoryResolvable } from "./routing";
+
 export interface CategoryCount {
   category: string;
   count: number;
@@ -13,8 +15,11 @@ export interface PostabilityResult {
 /**
  * Pure check: given the categories about to be posted (with transaction
  * counts) and the set of QBO account names (lowercased), determine which
- * categories have no matching account. Account matching is case-insensitive,
- * mirroring accountMap(). No QBO/DB access — easy to unit test.
+ * categories won't post. A category is resolvable if it matches an account name
+ * directly OR via a safe alias (e.g. "Software subscriptions" -> "Software &
+ * apps"); owner-decision categories (Owner draw, Seller Note Split, …) are
+ * deliberately treated as NOT resolvable so they surface as a warning before
+ * posting. Mirrors what postTransactions actually does. No QBO/DB access.
  */
 export function analyzePostability(
   categories: CategoryCount[],
@@ -25,8 +30,7 @@ export function analyzePostability(
   let missingCount = 0;
 
   for (const { category, count } of categories) {
-    const has = accountNames.has(category.toLowerCase().trim());
-    if (has) {
+    if (categoryResolvable(category, accountNames)) {
       matchedCount += count;
     } else {
       missing.push({ category, count });
