@@ -20,16 +20,19 @@ import type { QboAccount } from "./accounts";
  * that shows up on the Amex statement is amex-sourced, so it credits the Amex
  * card (the account it was actually paid on).
  *
- * Channel sources (shopify/hana/honeybook) are intentionally absent: whether
- * their own sales lines should post against a clearing account ("Shopify Bank"
- * etc.) is an accounting model the owner must confirm, so they fail loudly for
- * now. (Bank-deposit mirrors of channel revenue are already dropped upstream by
- * isRevenueMirror, so this only blocks the channels' own sales lines.)
+ * Channel sources (shopify/hana/honeybook) post their own sales lines against
+ * the matching clearing account in QBO ("Shopify Bank" / "Hana Bank" /
+ * "Honeybook Bank") — debit the clearing account, credit the channel's income.
+ * (Bank-deposit mirrors of channel revenue are already dropped upstream by
+ * isRevenueMirror, so only the channels' own sales lines reach here.)
  */
 export const SOURCE_ACCOUNT: Partial<Record<TransactionSource, string>> = {
   amex: "AMEX 7-01001",
   boa_credit: "BankAmericard Platinum Plus Mastercard - 2797 - 1",
   boa_checking: "Checking - 2300",
+  shopify: "Shopify Bank",
+  hana: "Hana Bank",
+  honeybook: "Honeybook Bank",
 };
 
 /**
@@ -43,6 +46,9 @@ export const CATEGORY_ALIAS: Record<string, string> = {
   janitorial: "Janitorial Service",
   "state taxes": "New York State Tax Payable",
   uncategorized: "Uncategorized Expense",
+  // Owner draws are booked against the equity account the books already use.
+  "owner draw": "Partner Equity",
+  "owner draw — kaela": "Partner Equity",
 };
 
 /**
@@ -51,8 +57,9 @@ export const CATEGORY_ALIAS: Record<string, string> = {
  * for these — they fail loudly until the owner assigns one. Keys are lowercased.
  */
 export const OWNER_DECISION_CATEGORIES = new Set<string>([
-  "owner draw",
-  "owner draw — kaela",
+  // Loan repayments need each payment split into principal (liability paydown)
+  // and interest (expense) per an amortization schedule — the 2-line builder
+  // can't do that, so they fail loudly until that's built out.
   "equipment loan payment",
   "seller note split",
 ]);
@@ -62,6 +69,28 @@ export type CategorySide = "Debit" | "Credit";
 /** Flip a posting side. */
 export function flipSide(side: CategorySide): CategorySide {
   return side === "Debit" ? "Credit" : "Debit";
+}
+
+/**
+ * Does this transaction's amount represent a REVERSAL of the normal direction
+ * (a refund/return), given its source's sign convention? This normalizes the
+ * inconsistent per-source sign conventions before posting:
+ *
+ *  - Cards (amex, boa_credit): a CHARGE is positive, a refund/credit is
+ *    negative — so a negative amount IS a reversal.
+ *  - boa_checking: the sign is the bank CASH-FLOW direction (deposit +,
+ *    withdrawal −), NOT a refund. A negative withdrawal is a perfectly normal
+ *    expense; direction comes from the category account type. So a checking
+ *    transaction is never itself a reversal.
+ *  - Channels (shopify/hana/honeybook): a sale is positive; a negative would be
+ *    a return — so a negative amount is a reversal.
+ *
+ * Without this, the builder treated every negative amount as a refund, which
+ * flipped checking expenses/owner-draws to the wrong debit/credit side.
+ */
+export function isReversal(source: TransactionSource, amount: number): boolean {
+  if (source === "boa_checking") return false;
+  return amount < 0;
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   categoryNormalSide,
   resolveCategoryAccount,
   resolveBankAccount,
+  isReversal,
 } from "./routing";
 
 /** Build a fake QBO account and a name->account map keyed like accountMap(). */
@@ -26,8 +27,13 @@ const ACCOUNTS = mapOf(
   mk("Cost of goods sold", "Cost of Goods Sold"),
   mk("Hana Sales", "Income"),
   mk("Shopify Sales", "Income"),
+  mk("Honeybook Sales", "Income"),
   mk("Sales Tax Payable", "Other Current Liabilities"),
   mk("Partner Equity", "Equity"),
+  // channel clearing accounts (bank side for channel sales)
+  mk("Hana Bank", "Other Assets"),
+  mk("Shopify Bank", "Other Current Assets"),
+  mk("Honeybook Bank", "Other Assets"),
   // alias targets
   mk("Software & apps", "Expense"),
   mk("Meals", "Expense"),
@@ -81,13 +87,16 @@ describe("resolveCategoryAccount", () => {
     }
   });
 
-  it("fails LOUDLY with owner_decision for categories that need an accounting decision", () => {
-    for (const category of [
-      "Owner draw",
-      "Owner draw — Kaela",
-      "Equipment Loan Payment",
-      "Seller Note Split",
-    ]) {
+  it("maps owner draws to the Partner Equity account", () => {
+    for (const category of ["Owner draw", "Owner draw — Kaela"]) {
+      const r = resolveCategoryAccount(category, ACCOUNTS);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.account.Name).toBe("Partner Equity");
+    }
+  });
+
+  it("still fails LOUDLY with owner_decision for loan payments (need principal/interest split)", () => {
+    for (const category of ["Equipment Loan Payment", "Seller Note Split"]) {
       const r = resolveCategoryAccount(category, ACCOUNTS);
       expect(r).toEqual({ ok: false, reason: "owner_decision", category });
     }
@@ -121,13 +130,19 @@ describe("resolveBankAccount — source -> bank/card account", () => {
     });
   });
 
-  it("fails LOUDLY with owner_decision for channel sources (clearing model unconfirmed)", () => {
-    for (const source of ["shopify", "hana", "honeybook"] as const) {
-      expect(resolveBankAccount(source, ACCOUNTS)).toEqual({
-        ok: false,
-        reason: "owner_decision",
-      });
-    }
+  it("routes channel sources to their clearing accounts", () => {
+    expect(resolveBankAccount("shopify", ACCOUNTS)).toEqual({
+      ok: true,
+      account: ACCOUNTS.get("shopify bank"),
+    });
+    expect(resolveBankAccount("hana", ACCOUNTS)).toEqual({
+      ok: true,
+      account: ACCOUNTS.get("hana bank"),
+    });
+    expect(resolveBankAccount("honeybook", ACCOUNTS)).toEqual({
+      ok: true,
+      account: ACCOUNTS.get("honeybook bank"),
+    });
   });
 
   it("fails with no_account when the mapped account is missing from QBO", () => {
@@ -138,5 +153,35 @@ describe("resolveBankAccount — source -> bank/card account", () => {
       reason: "no_account",
       accountName: "AMEX 7-01001",
     });
+  });
+});
+
+describe("isReversal — normalizes per-source sign conventions", () => {
+  // Cards (amex, boa_credit) record a CHARGE as positive and a refund/credit as
+  // negative. So a negative card amount IS a reversal of the normal direction.
+  it("treats a negative card amount as a reversal (refund)", () => {
+    expect(isReversal("amex", -21.75)).toBe(true);
+    expect(isReversal("boa_credit", -50)).toBe(true);
+  });
+  it("treats a positive card amount as a normal charge (not a reversal)", () => {
+    expect(isReversal("amex", 58.49)).toBe(false);
+    expect(isReversal("boa_credit", 100)).toBe(false);
+  });
+
+  // boa_checking records deposits positive and withdrawals negative — the sign
+  // is the CASH-FLOW direction, NOT a refund. A negative withdrawal is a normal
+  // expense, a positive deposit is normal income. Direction comes from the
+  // category account type, so a checking transaction is never itself a reversal.
+  it("never treats a checking transaction as a reversal (sign = cash flow)", () => {
+    expect(isReversal("boa_checking", -184.76)).toBe(false); // normal expense
+    expect(isReversal("boa_checking", 2201.08)).toBe(false); // normal deposit
+    expect(isReversal("boa_checking", -8000)).toBe(false); // normal owner draw
+  });
+
+  // Channels record a sale as positive; a negative would be a return/refund.
+  it("treats a negative channel amount as a return (reversal)", () => {
+    expect(isReversal("shopify", -82.59)).toBe(true);
+    expect(isReversal("hana", 103335)).toBe(false);
+    expect(isReversal("honeybook", 2164.49)).toBe(false);
   });
 });

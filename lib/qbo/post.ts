@@ -5,6 +5,7 @@ import type { TransactionSource } from "@/types/transaction";
 import {
   categoryNormalSide,
   flipSide,
+  isReversal,
   resolveBankAccount,
   resolveCategoryAccount,
 } from "./routing";
@@ -46,9 +47,15 @@ export interface JournalEntry {
  *
  * Direction comes from the CATEGORY account's type, NOT the amount sign — real
  * source data has positive amounts for both expenses and income, so sign alone
- * would post expenses as income. The category line's "normal" side (amount >= 0)
- * is Debit for Expense/COGS/Equity, Credit for Income/Liability. A negative
- * amount (refund/return) flips it. The bank line is always the opposite side.
+ * would post expenses as income. The category line's "normal" side is Debit for
+ * Expense/COGS/Equity, Credit for Income/Liability. The bank line is the
+ * opposite side.
+ *
+ * `reversal` flips both lines. It must be computed per source via isReversal()
+ * (NOT from the amount sign directly): cards record charges positive so a
+ * negative amount is a refund (reversal), but boa_checking records withdrawals
+ * negative as a normal cash-flow direction (never a reversal). Passing the raw
+ * `amount < 0` here would wrongly flip every checking expense.
  *
  * Throws if the category account has a type with no defined direction (e.g. a
  * Bank/AR/AP account) — callers must resolve a sensible category first, and
@@ -57,6 +64,7 @@ export interface JournalEntry {
 export function buildJournalEntry(
   tx: PostableTx,
   accounts: JournalAccounts,
+  reversal: boolean,
 ): JournalEntry {
   const abs = Math.abs(tx.amount);
 
@@ -66,8 +74,8 @@ export function buildJournalEntry(
       `Cannot determine debit/credit direction for account "${accounts.category.Name}" (type "${accounts.category.AccountType}").`,
     );
   }
-  // A negative amount reverses the entry (refund, return, payment).
-  const categorySide = tx.amount < 0 ? flipSide(normalSide) : normalSide;
+  // A reversal (refund/return) flips the normal direction.
+  const categorySide = reversal ? flipSide(normalSide) : normalSide;
   const bankSide = flipSide(categorySide);
 
   const categoryLine: JournalLine = {
@@ -283,6 +291,7 @@ export async function postTransactions(
     const je = buildJournalEntry(
       { ...tx, date: tx.transaction_date },
       { category: catResult.account, bank: bankResult.account },
+      isReversal(tx.source as TransactionSource, tx.amount),
     );
 
     try {
