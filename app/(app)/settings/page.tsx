@@ -13,6 +13,7 @@ import { DriveConnect } from "@/components/drive-connect";
 import { ShopifyConnect } from "@/components/shopify-connect";
 import { AccountCard } from "@/components/account-card";
 import { serviceAccountEmail } from "@/lib/drive/auth";
+import { getKnownCategories } from "@/lib/categories";
 
 export default async function SettingsPage() {
   const supabase = await createSSRClient();
@@ -25,6 +26,10 @@ export default async function SettingsPage() {
     .from("rulebook_rules")
     .select("id, rule_type, pattern, category, vendor, priority")
     .order("priority", { ascending: true });
+
+  // Categories the owner can pick from when editing a rule — same source the
+  // dashboard exception picker uses, so the list is consistent everywhere.
+  const categories = await getKnownCategories();
 
   // Read connection STATUS from non-secret views (qbo_status/drive_status), not
   // the token tables — those are no longer client-readable (migration 0007).
@@ -93,7 +98,7 @@ export default async function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <RulesTable rules={(rules ?? []) as Rule[]} />
+              <RulesTable rules={(rules ?? []) as Rule[]} categories={categories} />
             </CardContent>
           </Card>
         </TabsContent>

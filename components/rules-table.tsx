@@ -6,6 +6,7 @@ import { createRule, updateRule, deleteRule } from "@/app/actions/rules";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { CategoryPicker } from "@/components/category-picker";
 
 export interface Rule {
   id: string;
@@ -18,7 +19,13 @@ export interface Rule {
 
 const COLLAPSED_COUNT = 3;
 
-export function RulesTable({ rules }: { rules: Rule[] }) {
+export function RulesTable({
+  rules,
+  categories,
+}: {
+  rules: Rule[];
+  categories: string[];
+}) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -48,6 +55,7 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
 
       {adding && (
         <RuleForm
+          categories={categories}
           onCancel={() => setAdding(false)}
           onSave={(input) =>
             startSave(async () => {
@@ -65,6 +73,7 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
             <RuleForm
               key={rule.id}
               initial={rule}
+              categories={categories}
               onCancel={() => setEditingId(null)}
               onSave={(input) =>
                 startSave(async () => {
@@ -140,11 +149,13 @@ export function RulesTable({ rules }: { rules: Rule[] }) {
 
 function RuleForm({
   initial,
+  categories,
   onSave,
   onCancel,
   pending,
 }: {
   initial?: Rule;
+  categories: string[];
   onSave: (input: {
     pattern: string;
     category: string;
@@ -180,11 +191,11 @@ function RuleForm({
           <label htmlFor="rule-category" className="text-xs text-muted-foreground">
             Categorize it as
           </label>
-          <Input
+          <CategoryPicker
             id="rule-category"
-            placeholder="e.g. Office supplies"
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={setCategory}
+            categories={categories}
           />
         </div>
         <div className="flex flex-col gap-1.5 sm:col-span-2">
