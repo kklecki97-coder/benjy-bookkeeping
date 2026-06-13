@@ -41,11 +41,52 @@ describe("QBO journal entry builder — direction from account type", () => {
         date: "2026-05-09",
       },
       { category: VEHICLE, bank: AMEX },
+      false, // amex charge — not a reversal
     );
     const { debit, credit } = lines(je);
     expect(debit?.JournalEntryLineDetail.AccountRef.value).toBe(VEHICLE.Id);
     expect(credit?.JournalEntryLineDetail.AccountRef.value).toBe(AMEX.Id);
     expect(debit?.Amount).toBeCloseTo(58.49, 2);
+  });
+
+  it("REGRESSION: a NEGATIVE boa_checking expense still debits the expense (sign = cash flow, not refund)", () => {
+    // boa_checking records withdrawals as NEGATIVE — but that's the cash-flow
+    // direction, NOT a refund. A negative salary payment is a normal expense:
+    // it must DEBIT Salaries and CREDIT Checking. reversal=false makes that so.
+    const SALARIES = mk("Salaries & wages", "Expense");
+    const je = buildJournalEntry(
+      {
+        id: "t1b",
+        amount: -184.76, // negative withdrawal, but a normal expense
+        approved_category: "Salaries & wages",
+        description: "Zelle Recurring payment to ASH",
+        date: "2026-05-09",
+      },
+      { category: SALARIES, bank: CHECKING },
+      false, // checking withdrawal — never a reversal
+    );
+    const { debit, credit } = lines(je);
+    expect(debit?.JournalEntryLineDetail.AccountRef.value).toBe(SALARIES.Id);
+    expect(credit?.JournalEntryLineDetail.AccountRef.value).toBe(CHECKING.Id);
+  });
+
+  it("REGRESSION: a NEGATIVE boa_checking owner draw debits equity, credits checking", () => {
+    // Owner draw out of checking is negative (cash leaves). It must DEBIT
+    // Partner Equity (equity down) and CREDIT Checking (cash down) — NOT flipped.
+    const je = buildJournalEntry(
+      {
+        id: "t1c",
+        amount: -8000,
+        approved_category: "Owner draw",
+        description: "owner draw transfer",
+        date: "2026-05-15",
+      },
+      { category: EQUITY, bank: CHECKING },
+      false, // checking — never a reversal
+    );
+    const { debit, credit } = lines(je);
+    expect(debit?.JournalEntryLineDetail.AccountRef.value).toBe(EQUITY.Id);
+    expect(credit?.JournalEntryLineDetail.AccountRef.value).toBe(CHECKING.Id);
   });
 
   it("a NEGATIVE amex amount (refund) flips: credit the expense, debit the card", () => {
@@ -58,6 +99,7 @@ describe("QBO journal entry builder — direction from account type", () => {
         date: "2026-05-10",
       },
       { category: SOFTWARE, bank: AMEX },
+      true, // amex refund IS a reversal
     );
     const { debit, credit } = lines(je);
     expect(credit?.JournalEntryLineDetail.AccountRef.value).toBe(SOFTWARE.Id);
@@ -74,6 +116,7 @@ describe("QBO journal entry builder — direction from account type", () => {
         date: "2026-05-01",
       },
       { category: SHOPIFY_SALES, bank: SHOPIFY_BANK },
+      false,
     );
     const { debit, credit } = lines(je);
     expect(credit?.JournalEntryLineDetail.AccountRef.value).toBe(SHOPIFY_SALES.Id);
@@ -90,6 +133,7 @@ describe("QBO journal entry builder — direction from account type", () => {
         date: "2026-05-31",
       },
       { category: HANA_SALES, bank: HANA_BANK },
+      false,
     );
     const { credit } = lines(je);
     expect(credit?.JournalEntryLineDetail.AccountRef.value).toBe(HANA_SALES.Id);
@@ -105,6 +149,7 @@ describe("QBO journal entry builder — direction from account type", () => {
         date: "2026-05-31",
       },
       { category: SALES_TAX, bank: CHECKING },
+      false,
     );
     const { debit, credit } = lines(je);
     expect(credit?.JournalEntryLineDetail.AccountRef.value).toBe(SALES_TAX.Id);
@@ -121,6 +166,7 @@ describe("QBO journal entry builder — direction from account type", () => {
         date: "2026-05-08",
       },
       { category: COGS, bank: CHECKING },
+      false,
     );
     const { debit } = lines(je);
     expect(debit?.JournalEntryLineDetail.AccountRef.value).toBe(COGS.Id);
@@ -136,6 +182,7 @@ describe("QBO journal entry builder — direction from account type", () => {
         date: "2026-05-15",
       },
       { category: EQUITY, bank: CHECKING },
+      false,
     );
     const { debit, credit } = lines(je);
     expect(debit?.JournalEntryLineDetail.AccountRef.value).toBe(EQUITY.Id);
@@ -152,6 +199,7 @@ describe("QBO journal entry builder — direction from account type", () => {
         date: "2026-05-08",
       },
       { category: COGS, bank: CHECKING },
+      true,
     );
     expect(je.Line.length).toBe(2);
     const { debit, credit } = lines(je);
@@ -171,6 +219,7 @@ describe("QBO journal entry builder — direction from account type", () => {
         date: "2026-04-08",
       },
       { category: COGS, bank: CHECKING },
+      false,
     );
     expect(je.TxnDate).toBe("2026-04-08");
   });
