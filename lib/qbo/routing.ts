@@ -44,7 +44,9 @@ export const CATEGORY_ALIAS: Record<string, string> = {
   "meals & entertainment": "Meals",
   "software subscriptions": "Software & apps",
   janitorial: "Janitorial Service",
-  "state taxes": "New York State Tax Payable",
+  // NY sales-tax remittances book to "Sales Tax Payable" (the real account).
+  // ("New York State Tax Payable" exists in the chart but is unused/$0.)
+  "state taxes": "Sales Tax Payable",
   uncategorized: "Uncategorized Expense",
   // Owner draws are booked against the equity account the books already use.
   "owner draw": "Partner Equity",

@@ -140,18 +140,23 @@ export function summarizeHanaRows(rows: string[][]): PlatformSummary {
 
 export type Platform = "hana" | "honeybook" | "shopify";
 
-/** Canonical QBO account names per platform (must match the chart of accounts). */
+/**
+ * Canonical QBO account names per platform (must match the chart of accounts
+ * EXACTLY — verified against the real Towers Flowers chart). Shipping is
+ * per-platform ("Hana Shipping Income", "Shopify Shipping Income") — there is a
+ * generic "Shipping Income" too, but the platform-specific ones are correct.
+ * HoneyBook has no shipping (its CSV carries none), so it has no shipping acct.
+ */
 export const PLATFORM_ACCOUNTS: Record<
   Platform,
-  { sales: string; bank: string; fees: string }
+  { sales: string; bank: string; fees: string; shipping?: string }
 > = {
-  hana: { sales: "Hana Sales", bank: "Hana Bank", fees: "Hana Wire Fee" },
+  hana: { sales: "Hana Sales", bank: "Hana Bank", fees: "Hana Wire Fee", shipping: "Hana Shipping Income" },
   honeybook: { sales: "Honeybook Sales", bank: "Honeybook Bank", fees: "Honeybook Fees" },
-  shopify: { sales: "Shopify Sales", bank: "Shopify Bank", fees: "Shopify Fees" },
+  shopify: { sales: "Shopify Sales", bank: "Shopify Bank", fees: "Shopify Fees", shipping: "Shopify Shipping Income" },
 };
 
 const TAX_ACCOUNT = "Sales Tax Payable";
-const SHIPPING_ACCOUNT = "Shipping Income";
 
 const get = (accounts: Map<string, QboAccount>, name: string) =>
   accounts.get(name.toLowerCase().trim());
@@ -180,7 +185,7 @@ export function buildPlatformRevenueJe(
   // Required accounts. Fees/shipping only required when there's a non-zero figure.
   if (!salesAcct || !bankAcct || !taxAcct) return null;
   const feeAcct = get(accounts, names.fees);
-  const shipAcct = get(accounts, SHIPPING_ACCOUNT);
+  const shipAcct = names.shipping ? get(accounts, names.shipping) : undefined;
   if (s.fee > 0 && !feeAcct) return null;
   if (s.shipping > 0 && !shipAcct) return null;
 

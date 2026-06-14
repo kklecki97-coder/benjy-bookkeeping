@@ -77,7 +77,7 @@ describe("resolveCategoryAccount", () => {
       ["Software subscriptions", "Software & apps"],
       ["Meals & Entertainment", "Meals"],
       ["Janitorial", "Janitorial Service"],
-      ["State Taxes", "New York State Tax Payable"],
+      ["State Taxes", "Sales Tax Payable"],
       ["Uncategorized", "Uncategorized Expense"],
     ];
     for (const [category, target] of cases) {

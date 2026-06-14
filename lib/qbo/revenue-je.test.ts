@@ -26,7 +26,8 @@ const ACCOUNTS = mapOf(
   mk("Hana Bank", "Other Assets"),
   mk("Honeybook Bank", "Other Assets"),
   mk("Shopify Bank", "Other Current Assets"),
-  mk("Shipping Income", "Income"),
+  mk("Hana Shipping Income", "Income"),
+  mk("Shopify Shipping Income", "Income"),
 );
 
 const MAY = readFileSync("samples/Honeybook May-2026-Payments-report-.csv", "utf8");
@@ -168,5 +169,34 @@ describe("buildPlatformRevenueJe — summary -> balanced compound revenue JE", (
     expect(PLATFORM_ACCOUNTS.hana.sales).toBe("Hana Sales");
     expect(PLATFORM_ACCOUNTS.shopify.bank).toBe("Shopify Bank");
     expect(PLATFORM_ACCOUNTS.honeybook.fees).toBe("Honeybook Fees");
+  });
+
+  it("shipping is per-platform (real QBO has 'Hana Shipping Income', not generic)", () => {
+    // Verified against the real chart of accounts: Hana Shipping Income and
+    // Shopify Shipping Income exist as distinct accounts.
+    expect(PLATFORM_ACCOUNTS.hana.shipping).toBe("Hana Shipping Income");
+    expect(PLATFORM_ACCOUNTS.shopify.shipping).toBe("Shopify Shipping Income");
+  });
+
+  it("REAL DATA: Hana JE posts shipping to 'Hana Shipping Income' (not generic)", () => {
+    const accts = mapOf(
+      mk("Hana Sales", "Income"),
+      mk("Sales Tax Payable", "Other Current Liabilities"),
+      mk("Hana Bank", "Other Assets"),
+      mk("Hana Shipping Income", "Income"),
+    );
+    const rows: string[][] = [
+      ["Net Total Sales", "54,439.28"],
+      ["SalesTax Charged", "4,194.85"],
+      ["Total Delivery Fee", "1,749.00"],
+    ];
+    const s = summarizeHanaRows(rows);
+    const je = buildPlatformRevenueJe(s, "hana", "2026-04", accts);
+    expect(je).not.toBeNull();
+    const ship = je!.Line.find(
+      (l) => l.JournalEntryLineDetail.AccountRef.value === accts.get("hana shipping income")!.Id,
+    );
+    expect(ship?.Amount).toBeCloseTo(1749.0, 2);
+    expect(ship?.JournalEntryLineDetail.PostingType).toBe("Credit");
   });
 });

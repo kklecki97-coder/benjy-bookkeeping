@@ -183,24 +183,29 @@ export async function postTransactions(
   for (const tx of (txs ?? []) as PostRow[]) {
     if (!shouldPost(tx)) continue;
 
-    // Bank-deposit mirror of channel revenue: the channel's own sales line
-    // already books this income, so posting the deposit too would double-count
-    // revenue in QuickBooks. The display layer drops these; the post path must
-    // too. Mark skipped (not posted) with a clear reason + audit entry so the
-    // owner can still see/reconcile the deposit, and move on.
+    // Channel-deposit clearing (V3 model): a bank deposit for a sales channel
+    // (e.g. a CLEARENT/Hana settlement, a MIMOSA/HoneyBook deposit) does NOT
+    // post revenue — revenue is recognized once per month in the platform's
+    // compound JE. The deposit should CLEAR the [Platform] Bank account. We
+    // don't auto-post that clearing yet: the [Platform] Bank balances don't
+    // reliably net to zero within a single month (timing — some deposits settle
+    // the next month; verified May HoneyBook plug $41,294.92 vs $29,935.42 of
+    // deposits), and we have no QBO-balance read to run the clearing-to-zero
+    // control. So flag it for review (post_failed with a clear reason) instead
+    // of silently skipping or guessing a clearing entry. Never post it as Sales.
     if (isRevenueMirror(tx)) {
       await supabase
         .from("transactions")
         .update({
-          status: "skipped",
+          status: "post_failed",
           qbo_post_error:
-            "Bank deposit mirroring channel sales — not posted to avoid double-counting revenue (the channel's own sales line is posted instead).",
+            "Channel deposit — clears the platform's bank/clearing account (revenue is booked once in the month-end compound JE). Needs review: confirm against the clearing-account balance before posting; do NOT post as Sales.",
         })
         .eq("id", tx.id);
       await supabase.from("audit_log").insert({
         monthly_run_id: runId,
         transaction_id: tx.id,
-        action: "skipped_revenue_mirror",
+        action: "flagged_channel_deposit",
       });
       continue;
     }

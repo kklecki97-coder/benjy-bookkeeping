@@ -49,4 +49,13 @@ describe("rulebook rules", () => {
       );
     }
   });
+
+  it("DTF guard: NY tax payment flags for review, NEVER auto-books to Sales Tax Payable", () => {
+    const rules = getRulebookRules();
+    const dtf = rules.find((r) => /NYS DTF/i.test(r.pattern));
+    expect(dtf).toBeDefined();
+    // Must NOT auto-book to Sales Tax Payable — the bank doesn't say sales vs income tax.
+    expect(dtf?.category).not.toBe("Sales Tax Payable");
+    expect(dtf?.rule_type).toBe("exception");
+  });
 });

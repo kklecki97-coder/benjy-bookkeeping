@@ -113,6 +113,15 @@ const EXCEPTIONS: RulebookRule[] = [
     "Owner draw — Kaela",
     "Weekly owner draw via bank transfer.",
   ),
+  // NYS DTF guard (V3): NY tax payments must NEVER be auto-booked to Sales Tax
+  // Payable — the real BOA descriptor ("NYS DTF BILL PYT DES:Tax Paymnt") does
+  // NOT say whether it's sales tax or personal income tax (PIT). Flag for owner
+  // review instead of guessing. The PIT-vs-SALES distinction is the owner's call.
+  exception(
+    "NYS DTF",
+    "Uncategorized",
+    "NY tax payment (e.g. 'NYS DTF BILL PYT'). The bank does NOT encode sales-tax vs personal income tax — STOP and ask owner: SALES → Sales Tax Payable, PIT/personal → Owner draw, processing fee → Bank Fees. Never auto-book to Sales Tax Payable.",
+  ),
 ];
 
 export function getRulebookRules(): RulebookRule[] {
