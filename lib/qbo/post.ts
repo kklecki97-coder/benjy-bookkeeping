@@ -9,6 +9,7 @@ import {
   resolveBankAccount,
   resolveCategoryAccount,
 } from "./routing";
+import { buildCompoundEntry } from "./compound";
 
 export interface PostableTx {
   id: string;
@@ -26,7 +27,7 @@ export interface JournalAccounts {
   bank: QboAccount;
 }
 
-interface JournalLine {
+export interface JournalLine {
   Amount: number;
   DetailType: "JournalEntryLineDetail";
   Description?: string;
@@ -78,32 +79,15 @@ export function buildJournalEntry(
   const categorySide = reversal ? flipSide(normalSide) : normalSide;
   const bankSide = flipSide(categorySide);
 
-  const categoryLine: JournalLine = {
-    Amount: abs,
-    DetailType: "JournalEntryLineDetail",
-    Description: tx.description,
-    JournalEntryLineDetail: {
-      PostingType: categorySide,
-      AccountRef: { value: accounts.category.Id },
-    },
-  };
-  const bankLine: JournalLine = {
-    Amount: abs,
-    DetailType: "JournalEntryLineDetail",
-    Description: tx.description,
-    JournalEntryLineDetail: {
-      PostingType: bankSide,
-      AccountRef: { value: accounts.bank.Id },
-    },
-  };
-  const je: JournalEntry = {
-    Line: [categoryLine, bankLine],
-    PrivateNote: `txid:${tx.id}`,
-  };
-  // Stamp the period the transaction occurred in. Without this QBO defaults
-  // TxnDate to "today" (the post date), pushing e.g. April expenses into June.
-  if (tx.date) je.TxnDate = tx.date;
-  return je;
+  // A 2-line entry is just the simplest compound entry — reuse the same builder
+  // (and its balance guard) so all journal entries go through one code path.
+  return buildCompoundEntry(
+    [
+      { account: accounts.category, side: categorySide, amount: abs, description: tx.description },
+      { account: accounts.bank, side: bankSide, amount: abs, description: tx.description },
+    ],
+    { privateNote: `txid:${tx.id}`, ...(tx.date ? { txnDate: tx.date } : {}) },
+  );
 }
 
 /** Idempotency + eligibility guard: should this transaction be posted now? */
@@ -199,24 +183,29 @@ export async function postTransactions(
   for (const tx of (txs ?? []) as PostRow[]) {
     if (!shouldPost(tx)) continue;
 
-    // Bank-deposit mirror of channel revenue: the channel's own sales line
-    // already books this income, so posting the deposit too would double-count
-    // revenue in QuickBooks. The display layer drops these; the post path must
-    // too. Mark skipped (not posted) with a clear reason + audit entry so the
-    // owner can still see/reconcile the deposit, and move on.
+    // Channel-deposit clearing (V3 model): a bank deposit for a sales channel
+    // (e.g. a CLEARENT/Hana settlement, a MIMOSA/HoneyBook deposit) does NOT
+    // post revenue — revenue is recognized once per month in the platform's
+    // compound JE. The deposit should CLEAR the [Platform] Bank account. We
+    // don't auto-post that clearing yet: the [Platform] Bank balances don't
+    // reliably net to zero within a single month (timing — some deposits settle
+    // the next month; verified May HoneyBook plug $41,294.92 vs $29,935.42 of
+    // deposits), and we have no QBO-balance read to run the clearing-to-zero
+    // control. So flag it for review (post_failed with a clear reason) instead
+    // of silently skipping or guessing a clearing entry. Never post it as Sales.
     if (isRevenueMirror(tx)) {
       await supabase
         .from("transactions")
         .update({
-          status: "skipped",
+          status: "post_failed",
           qbo_post_error:
-            "Bank deposit mirroring channel sales — not posted to avoid double-counting revenue (the channel's own sales line is posted instead).",
+            "Channel deposit — clears the platform's bank/clearing account (revenue is booked once in the month-end compound JE). Needs review: confirm against the clearing-account balance before posting; do NOT post as Sales.",
         })
         .eq("id", tx.id);
       await supabase.from("audit_log").insert({
         monthly_run_id: runId,
         transaction_id: tx.id,
-        action: "skipped_revenue_mirror",
+        action: "flagged_channel_deposit",
       });
       continue;
     }
