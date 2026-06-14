@@ -9,6 +9,7 @@ import {
   resolveBankAccount,
   resolveCategoryAccount,
 } from "./routing";
+import { buildCompoundEntry } from "./compound";
 
 export interface PostableTx {
   id: string;
@@ -26,7 +27,7 @@ export interface JournalAccounts {
   bank: QboAccount;
 }
 
-interface JournalLine {
+export interface JournalLine {
   Amount: number;
   DetailType: "JournalEntryLineDetail";
   Description?: string;
@@ -78,32 +79,15 @@ export function buildJournalEntry(
   const categorySide = reversal ? flipSide(normalSide) : normalSide;
   const bankSide = flipSide(categorySide);
 
-  const categoryLine: JournalLine = {
-    Amount: abs,
-    DetailType: "JournalEntryLineDetail",
-    Description: tx.description,
-    JournalEntryLineDetail: {
-      PostingType: categorySide,
-      AccountRef: { value: accounts.category.Id },
-    },
-  };
-  const bankLine: JournalLine = {
-    Amount: abs,
-    DetailType: "JournalEntryLineDetail",
-    Description: tx.description,
-    JournalEntryLineDetail: {
-      PostingType: bankSide,
-      AccountRef: { value: accounts.bank.Id },
-    },
-  };
-  const je: JournalEntry = {
-    Line: [categoryLine, bankLine],
-    PrivateNote: `txid:${tx.id}`,
-  };
-  // Stamp the period the transaction occurred in. Without this QBO defaults
-  // TxnDate to "today" (the post date), pushing e.g. April expenses into June.
-  if (tx.date) je.TxnDate = tx.date;
-  return je;
+  // A 2-line entry is just the simplest compound entry — reuse the same builder
+  // (and its balance guard) so all journal entries go through one code path.
+  return buildCompoundEntry(
+    [
+      { account: accounts.category, side: categorySide, amount: abs, description: tx.description },
+      { account: accounts.bank, side: bankSide, amount: abs, description: tx.description },
+    ],
+    { privateNote: `txid:${tx.id}`, ...(tx.date ? { txnDate: tx.date } : {}) },
+  );
 }
 
 /** Idempotency + eligibility guard: should this transaction be posted now? */
